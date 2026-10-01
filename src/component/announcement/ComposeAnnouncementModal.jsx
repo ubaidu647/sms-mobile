@@ -44,8 +44,10 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
   const C = useColors();
   const { user } = useUserStore();
   const isAdmin = !!user?.role?.isPredefined;
-  const isOrgLevel =
-    isAdmin || !!user?.role?.actions?.includes('create-all-branch-announcement');
+  const isOrgLevel = isAdmin || !!user?.role?.actions?.includes('create-all-branch-announcement');
+  // Publishing is its own permission; without it a new notice can only be a draft.
+  const canPublish = isAdmin || !!user?.role?.actions?.includes('publish-announcement');
+  const statusOptions = canPublish ? ['draft', 'published'] : ['draft'];
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -56,7 +58,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
   const [expiresAt, setExpiresAt] = useState('');
   const [isPinned, setIsPinned] = useState(false);
   const [requiresAck, setRequiresAck] = useState(false);
-  const [statusChoice, setStatusChoice] = useState('published');
+  const [statusChoice, setStatusChoice] = useState('draft');
   const [attachment, setAttachment] = useState(null);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
     setExpiresAt('');
     setIsPinned(false);
     setRequiresAck(false);
-    setStatusChoice('published');
+    setStatusChoice('draft');
     setAttachment(null);
   }, [open]);
 
@@ -108,8 +110,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
     if (!audience.targetUserTypes?.length) return 'Pick at least one user type';
     if (audience.scope === 'branch' && !audience.branchIds?.length)
       return 'Pick at least one branch';
-    if (audience.scope === 'class' && !audience.classIds?.length)
-      return 'Pick at least one class';
+    if (audience.scope === 'class' && !audience.classIds?.length) return 'Pick at least one class';
     if (audience.scope === 'section' && !audience.sectionIds?.length)
       return 'Pick at least one section';
     if (audience.scope === 'staff' && !audience.staffIds?.length)
@@ -130,7 +131,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
     fd.append('body', body);
     fd.append('type', type);
     fd.append('priority', priority);
-    fd.append('status', statusChoice);
+    fd.append('status', canPublish ? statusChoice : 'draft');
     fd.append('audience', JSON.stringify(audience));
     if (publishedAt) fd.append('publishedAt', publishedAt);
     if (expiresAt) fd.append('expiresAt', expiresAt);
@@ -191,7 +192,10 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                 onChangeText={setTitle}
                 placeholder="e.g. Sports day on Friday"
                 placeholderTextColor={C.mutedSoft}
-                style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                style={[
+                  styles.input,
+                  { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                ]}
               />
             </View>
 
@@ -233,11 +237,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                         pressed && { opacity: 0.85 },
                       ]}
                     >
-                      <Feather
-                        name={TYPE_ICONS[t]}
-                        size={11}
-                        color={active ? '#fff' : C.muted}
-                      />
+                      <Feather name={TYPE_ICONS[t]} size={11} color={active ? '#fff' : C.muted} />
                       <Text
                         style={[
                           styles.chipText,
@@ -272,12 +272,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                         pressed && { opacity: 0.85 },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          { color: active ? '#fff' : C.text },
-                        ]}
-                      >
+                      <Text style={[styles.chipText, { color: active ? '#fff' : C.text }]}>
                         {pill.label}
                       </Text>
                     </Pressable>
@@ -296,7 +291,10 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
-                  style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                  style={[
+                    styles.input,
+                    { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                  ]}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -308,7 +306,10 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
-                  style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                  style={[
+                    styles.input,
+                    { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                  ]}
                 />
               </View>
             </View>
@@ -359,7 +360,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
             <View>
               <Text style={[styles.label, { color: C.muted }]}>STATUS</Text>
               <View style={styles.chipRow}>
-                {['draft', 'published'].map((s) => {
+                {statusOptions.map((s) => {
                   const active = statusChoice === s;
                   return (
                     <Pressable
@@ -388,15 +389,13 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
             </View>
 
             <Text style={[styles.section, { color: C.muted }]}>AUDIENCE</Text>
-            <AudiencePicker
-              value={audience}
-              onChange={setAudience}
-              isOrgLevel={isOrgLevel}
-            />
+            <AudiencePicker value={audience} onChange={setAudience} isOrgLevel={isOrgLevel} />
 
             <Text style={[styles.section, { color: C.muted }]}>ATTACHMENT</Text>
             {attachment ? (
-              <View style={[styles.attachmentRow, { backgroundColor: C.bg, borderColor: C.border }]}>
+              <View
+                style={[styles.attachmentRow, { backgroundColor: C.bg, borderColor: C.border }]}
+              >
                 <View style={styles.attachIcon}>
                   <Feather name="paperclip" size={14} color={COLORS.brand} />
                 </View>

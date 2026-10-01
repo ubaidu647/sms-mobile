@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useBranchesDropdown } from '../../hooks/useBranchProfilesList';
 import { useClassesDropdown, useSectionsDropdown } from '../../hooks/useStudents';
 import { useUserStore } from '../../store/userStore';
+import { useMyAttendanceSections } from '../../hooks/useAttendance';
 import { hasAnyAction } from '../../utils/permissions';
 import { currentAcademicYear } from '../../constants/attendance';
 import { useColors } from '../../theme/useColors';
@@ -23,18 +24,16 @@ export default function AttendancePickers({
   setSectionId,
   showSection = true,
   showAcademicYear = true,
+  markableOnly = false, // limit class/section chips to what the caller may mark
   extraSlot, // e.g. a date picker rendered alongside
 }) {
   const C = useColors();
   const { user } = useUserStore();
 
   const isOrgLevel =
-    !!user?.role?.isPredefined ||
-    hasAnyAction(user?.role, ['view-all-branch-attendance']);
+    !!user?.role?.isPredefined || hasAnyAction(user?.role, ['view-all-branch-attendance']);
   const userBranchId =
-    typeof user?.branchId === 'string'
-      ? user.branchId
-      : user?.branchId?._id || null;
+    typeof user?.branchId === 'string' ? user.branchId : user?.branchId?._id || null;
 
   const effectiveBranchId = isOrgLevel ? branchId : userBranchId;
 
@@ -46,12 +45,28 @@ export default function AttendancePickers({
     academicYear: academicYear || currentAcademicYear(),
     enabled: !!effectiveBranchId && !!academicYear,
   });
-  const classes = classesData?.data || [];
+  const { data: markable } = useMyAttendanceSections({ enabled: markableOnly });
+  // null/undefined = endpoint missing or still loading → no filtering.
+  const markableIds = useMemo(() => {
+    if (!markableOnly || !Array.isArray(markable)) return null;
+    return {
+      classIds: new Set(markable.map((m) => String(m.classId))),
+      sectionIds: new Set(markable.map((m) => String(m.sectionId))),
+    };
+  }, [markableOnly, markable]);
+
+  const allClasses = classesData?.data || [];
+  const classes = markableIds
+    ? allClasses.filter((c) => markableIds.classIds.has(String(c._id)))
+    : allClasses;
 
   const { data: sectionsData } = useSectionsDropdown(classId, {
     enabled: showSection && !!classId,
   });
-  const sections = sectionsData?.data || [];
+  const allSections = sectionsData?.data || [];
+  const sections = markableIds
+    ? allSections.filter((s) => markableIds.sectionIds.has(String(s._id)))
+    : allSections;
 
   // Cascade resets
   useEffect(() => {
@@ -85,10 +100,7 @@ export default function AttendancePickers({
             onChangeText={setAcademicYear}
             placeholder="2025-2026"
             placeholderTextColor={C.mutedSoft}
-            style={[
-              styles.input,
-              { color: C.text, backgroundColor: C.bg, borderColor: C.border },
-            ]}
+            style={[styles.input, { color: C.text, backgroundColor: C.bg, borderColor: C.border }]}
           />
         </Block>
       )}
@@ -107,7 +119,11 @@ export default function AttendancePickers({
             C={C}
           />
         ) : (
-          <Hint C={C}>No active classes for this branch/year.</Hint>
+          <Hint C={C}>
+            {markableIds
+              ? 'No classes you can mark attendance for in this branch/year.'
+              : 'No active classes for this branch/year.'}
+          </Hint>
         )}
       </Block>
 
@@ -146,11 +162,7 @@ function Block({ label, children, C }) {
 }
 
 function Hint({ children, C }) {
-  return (
-    <Text style={{ color: C.mutedSoft, fontSize: 12, fontStyle: 'italic' }}>
-      {children}
-    </Text>
-  );
+  return <Text style={{ color: C.mutedSoft, fontSize: 12, fontStyle: 'italic' }}>{children}</Text>;
 }
 
 function Chips({ value, options, onChange, C }) {
@@ -168,13 +180,7 @@ function Chips({ value, options, onChange, C }) {
               active && styles.chipActive,
             ]}
           >
-            <Text
-              style={[
-                styles.chipText,
-                { color: C.text },
-                active && styles.chipTextActive,
-              ]}
-            >
+            <Text style={[styles.chipText, { color: C.text }, active && styles.chipTextActive]}>
               {opt.label}
             </Text>
           </Pressable>

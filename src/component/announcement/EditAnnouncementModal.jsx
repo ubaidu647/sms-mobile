@@ -33,8 +33,13 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
   const C = useColors();
   const { user } = useUserStore();
   const isAdmin = !!user?.role?.isPredefined;
-  const isOrgLevel =
-    isAdmin || !!user?.role?.actions?.includes('update-all-branch-announcement');
+  const isOrgLevel = isAdmin || !!user?.role?.actions?.includes('update-all-branch-announcement');
+  // Moving to published/archived needs publish-announcement; without it only
+  // draft (or leaving the current status untouched) is offered.
+  const canPublish = isAdmin || !!user?.role?.actions?.includes('publish-announcement');
+  const statusOptions = canPublish
+    ? ANNOUNCEMENT_STATUSES
+    : ANNOUNCEMENT_STATUSES.filter((s) => s === 'draft' || s === announcement?.status);
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -45,7 +50,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
   const [expiresAt, setExpiresAt] = useState('');
   const [isPinned, setIsPinned] = useState(false);
   const [requiresAck, setRequiresAck] = useState(false);
-  const [status, setStatus] = useState('published');
+  const [status, setStatus] = useState('draft');
   const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
@@ -59,7 +64,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
     setExpiresAt(toYMD(announcement.expiresAt));
     setIsPinned(!!announcement.isPinned);
     setRequiresAck(!!announcement.requiresAck);
-    setStatus(announcement.status || 'published');
+    setStatus(announcement.status || 'draft');
     setIsActive(announcement.isActive !== false);
   }, [open, announcement]);
 
@@ -140,7 +145,10 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                 onChangeText={setTitle}
                 placeholder="Title"
                 placeholderTextColor={C.mutedSoft}
-                style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                style={[
+                  styles.input,
+                  { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                ]}
               />
             </View>
 
@@ -182,11 +190,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                         pressed && { opacity: 0.85 },
                       ]}
                     >
-                      <Feather
-                        name={TYPE_ICONS[t]}
-                        size={11}
-                        color={active ? '#fff' : C.muted}
-                      />
+                      <Feather name={TYPE_ICONS[t]} size={11} color={active ? '#fff' : C.muted} />
                       <Text
                         style={[
                           styles.chipText,
@@ -221,12 +225,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                         pressed && { opacity: 0.85 },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          { color: active ? '#fff' : C.text },
-                        ]}
-                      >
+                      <Text style={[styles.chipText, { color: active ? '#fff' : C.text }]}>
                         {pill.label}
                       </Text>
                     </Pressable>
@@ -245,7 +244,10 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
-                  style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                  style={[
+                    styles.input,
+                    { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                  ]}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -257,7 +259,10 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
-                  style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                  style={[
+                    styles.input,
+                    { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                  ]}
                 />
               </View>
             </View>
@@ -328,7 +333,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
             <View>
               <Text style={[styles.label, { color: C.muted }]}>STATUS</Text>
               <View style={styles.chipRow}>
-                {ANNOUNCEMENT_STATUSES.map((s) => {
+                {statusOptions.map((s) => {
                   const active = status === s;
                   return (
                     <Pressable
@@ -357,11 +362,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
             </View>
 
             <Text style={[styles.section, { color: C.muted }]}>AUDIENCE</Text>
-            <AudiencePicker
-              value={audience}
-              onChange={setAudience}
-              isOrgLevel={isOrgLevel}
-            />
+            <AudiencePicker value={audience} onChange={setAudience} isOrgLevel={isOrgLevel} />
 
             <Pressable
               onPress={submit}

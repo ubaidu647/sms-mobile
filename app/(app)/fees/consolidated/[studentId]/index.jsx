@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -33,6 +33,7 @@ import {
   formatMonth,
   todayYMD,
 } from '../../../../../src/constants/fee';
+import { newIdempotencyKey } from '../../../../../src/utils/idempotency';
 
 function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
   const C = useColors();
@@ -42,6 +43,11 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
   const [method, setMethod] = useState('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
+  // One key per opening of the modal, reused on retries so a resubmit can't double-record.
+  const [idempotencyKey, setIdempotencyKey] = useState(null);
+  useEffect(() => {
+    if (open) setIdempotencyKey(newIdempotencyKey());
+  }, [open]);
 
   if (open && amount === '' && outstanding > 0) {
     // initial fill — but only once per open
@@ -73,7 +79,7 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
     const payload = { studentId, amount: num, paymentDate, method };
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();
     if (notes.trim()) payload.notes = notes.trim();
-    pay.mutate(payload);
+    pay.mutate({ ...payload, idempotencyKey });
   };
 
   return (
@@ -105,7 +111,9 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
               </Pressable>
             </View>
 
-            <View style={[styles.balanceCard, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
+            <View
+              style={[styles.balanceCard, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}
+            >
               <Text style={styles.balanceLabel}>OUTSTANDING</Text>
               <Text style={styles.balanceValue}>{formatMoney(outstanding)}</Text>
             </View>
@@ -329,12 +337,7 @@ export default function ConsolidatedPage() {
         {/* Totals */}
         <View style={styles.statsGrid}>
           <Stat label="Total" value={formatMoney(totals.grandTotal ?? 0)} C={C} />
-          <Stat
-            label="Paid"
-            value={formatMoney(totals.paidTotal ?? 0)}
-            color="#166534"
-            C={C}
-          />
+          <Stat label="Paid" value={formatMoney(totals.paidTotal ?? 0)} color="#166534" C={C} />
           <Stat
             label="Outstanding"
             value={formatMoney(outstanding)}
@@ -347,10 +350,7 @@ export default function ConsolidatedPage() {
         {canPay && outstanding > 0 && (
           <Pressable
             onPress={() => setPayOpen(true)}
-            style={({ pressed }) => [
-              styles.payBtn,
-              pressed && { opacity: 0.9 },
-            ]}
+            style={({ pressed }) => [styles.payBtn, pressed && { opacity: 0.9 }]}
           >
             <Feather name="dollar-sign" size={16} color="#fff" />
             <Text style={styles.payBtnText}>Pay Outstanding</Text>

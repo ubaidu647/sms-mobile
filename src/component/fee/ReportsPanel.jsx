@@ -30,6 +30,9 @@ import {
 import { hasAnyAction } from '../../utils/permissions';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import ReportPager from '../ReportPager';
+
+const REPORT_PAGE_SIZE = 100;
 
 function CollectionReport({ C }) {
   const { user } = useUserStore();
@@ -63,7 +66,10 @@ function CollectionReport({ C }) {
               placeholderTextColor={C.mutedSoft}
               keyboardType="numbers-and-punctuation"
               autoCapitalize="none"
-              style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+              style={[
+                styles.input,
+                { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+              ]}
             />
           </View>
           <View style={{ flex: 1 }}>
@@ -75,7 +81,10 @@ function CollectionReport({ C }) {
               placeholderTextColor={C.mutedSoft}
               keyboardType="numbers-and-punctuation"
               autoCapitalize="none"
-              style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+              style={[
+                styles.input,
+                { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+              ]}
             />
           </View>
         </View>
@@ -92,7 +101,9 @@ function CollectionReport({ C }) {
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text style={[styles.chipText, { color: C.text }, !branchId && styles.chipTextActive]}>
+                <Text
+                  style={[styles.chipText, { color: C.text }, !branchId && styles.chipTextActive]}
+                >
                   All
                 </Text>
               </Pressable>
@@ -135,7 +146,12 @@ function CollectionReport({ C }) {
         </View>
       ) : (
         <>
-          <View style={[styles.kpi, { backgroundColor: COLORS.brand + '10', borderColor: COLORS.brand + '40' }]}>
+          <View
+            style={[
+              styles.kpi,
+              { backgroundColor: COLORS.brand + '10', borderColor: COLORS.brand + '40' },
+            ]}
+          >
             <View>
               <Text style={[styles.kpiLabel, { color: COLORS.brand }]}>GRAND TOTAL</Text>
               <Text style={[styles.kpiValue, { color: COLORS.brand }]}>
@@ -196,6 +212,7 @@ function OutstandingReport({ C }) {
   const [branchId, setBranchId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
+  const [page, setPage] = useState(1);
 
   const { data: branchData } = useBranchesDropdown({ enabled: isOrgLevel });
   const branches = branchData?.data || [];
@@ -218,8 +235,12 @@ function OutstandingReport({ C }) {
     branchId: effectiveBranchId || undefined,
     classId,
     sectionId,
+    page,
+    limit: REPORT_PAGE_SIZE,
   });
-  const rows = data?.data || [];
+  // { grandTotal, studentCount, page, limit, truncated, students: [flat rows] }
+  const report = data?.data;
+  const rows = report?.students || [];
 
   return (
     <View style={{ gap: 12 }}>
@@ -241,7 +262,10 @@ function OutstandingReport({ C }) {
             <Text style={[styles.label, { color: C.muted }]}>BRANCH</Text>
             <View style={styles.chipRow}>
               <Pressable
-                onPress={() => setBranchId('')}
+                onPress={() => {
+                  setBranchId('');
+                  setPage(1);
+                }}
                 style={({ pressed }) => [
                   styles.chip,
                   { backgroundColor: C.bg, borderColor: C.border },
@@ -258,7 +282,10 @@ function OutstandingReport({ C }) {
               {branches.map((b) => (
                 <Pressable
                   key={b._id}
-                  onPress={() => setBranchId(b._id)}
+                  onPress={() => {
+                    setBranchId(b._id);
+                    setPage(1);
+                  }}
                   style={({ pressed }) => [
                     styles.chip,
                     { backgroundColor: C.bg, borderColor: C.border },
@@ -288,6 +315,7 @@ function OutstandingReport({ C }) {
                 onPress={() => {
                   setClassId('');
                   setSectionId('');
+                  setPage(1);
                 }}
                 style={({ pressed }) => [
                   styles.chip,
@@ -296,7 +324,9 @@ function OutstandingReport({ C }) {
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text style={[styles.chipText, { color: C.text }, !classId && styles.chipTextActive]}>
+                <Text
+                  style={[styles.chipText, { color: C.text }, !classId && styles.chipTextActive]}
+                >
                   All
                 </Text>
               </Pressable>
@@ -306,6 +336,7 @@ function OutstandingReport({ C }) {
                   onPress={() => {
                     setClassId(c._id);
                     setSectionId('');
+                    setPage(1);
                   }}
                   style={({ pressed }) => [
                     styles.chip,
@@ -333,7 +364,10 @@ function OutstandingReport({ C }) {
             <Text style={[styles.label, { color: C.muted }]}>SECTION</Text>
             <View style={styles.chipRow}>
               <Pressable
-                onPress={() => setSectionId('')}
+                onPress={() => {
+                  setSectionId('');
+                  setPage(1);
+                }}
                 style={({ pressed }) => [
                   styles.chip,
                   { backgroundColor: C.bg, borderColor: C.border },
@@ -350,7 +384,10 @@ function OutstandingReport({ C }) {
               {sections.map((s) => (
                 <Pressable
                   key={s._id}
-                  onPress={() => setSectionId(s._id)}
+                  onPress={() => {
+                    setSectionId(s._id);
+                    setPage(1);
+                  }}
                   style={({ pressed }) => [
                     styles.chip,
                     { backgroundColor: C.bg, borderColor: C.border },
@@ -381,42 +418,66 @@ function OutstandingReport({ C }) {
       ) : rows.length === 0 ? (
         <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
           <Feather name="check-circle" size={28} color="#16a34a" />
-          <Text style={[styles.emptyText, { color: C.muted }]}>
-            No outstanding vouchers.
-          </Text>
+          <Text style={[styles.emptyText, { color: C.muted }]}>No outstanding vouchers.</Text>
         </View>
       ) : (
-        rows.map((r) => (
-          <Pressable
-            key={r._id || r.studentId}
-            onPress={() => router.push(`/(app)/fees/consolidated/${r._id || r.studentId}`)}
-            style={({ pressed }) => [
-              styles.outRow,
-              { backgroundColor: C.card, borderColor: C.border },
-              pressed && { opacity: 0.92 },
-            ]}
-          >
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.outName, { color: C.text }]} numberOfLines={1}>
-                {r.student?.user?.name || '—'}
-              </Text>
-              <Text style={[styles.outMeta, { color: C.muted }]} numberOfLines={1}>
-                {r.student?.admissionNumber || '—'}
-                {r.student?.rollNumber ? ` · Roll ${r.student.rollNumber}` : ''}
-              </Text>
-              <Text style={[styles.outMeta, { color: C.mutedSoft }]}>
-                {r.voucherCount} voucher{r.voucherCount === 1 ? '' : 's'}
-                {r.oldestDueDate ? `  ·  oldest due ${formatDate(r.oldestDueDate)}` : ''}
+        <>
+          <View style={[styles.kpi, { backgroundColor: '#991b1b10', borderColor: '#991b1b40' }]}>
+            <View>
+              <Text style={[styles.kpiLabel, { color: '#991b1b' }]}>OUTSTANDING</Text>
+              <Text style={[styles.kpiValue, { color: '#991b1b' }]}>
+                {formatMoney(report?.grandTotal)}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.outAmount, { color: '#991b1b' }]}>
-                {formatMoney(r.outstandingTotal)}
+              <Text style={[styles.kpiLabel, { color: C.muted }]}>STUDENTS</Text>
+              <Text style={[styles.kpiValue, { color: C.text }]}>
+                {report?.studentCount ?? rows.length}
               </Text>
-              <Feather name="chevron-right" size={16} color={C.mutedSoft} />
             </View>
-          </Pressable>
-        ))
+          </View>
+          <ReportPager
+            page={report?.page || page}
+            limit={report?.limit || REPORT_PAGE_SIZE}
+            shown={rows.length}
+            total={report?.studentCount}
+            truncated={report?.truncated}
+            onPage={setPage}
+            noun="students"
+            C={C}
+          />
+          {rows.map((r) => (
+            <Pressable
+              key={r.studentId}
+              onPress={() => router.push(`/(app)/fees/consolidated/${r.studentId}`)}
+              style={({ pressed }) => [
+                styles.outRow,
+                { backgroundColor: C.card, borderColor: C.border },
+                pressed && { opacity: 0.92 },
+              ]}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.outName, { color: C.text }]} numberOfLines={1}>
+                  {r.name || '—'}
+                </Text>
+                <Text style={[styles.outMeta, { color: C.muted }]} numberOfLines={1}>
+                  {r.admissionNumber || '—'}
+                  {r.rollNumber ? ` · Roll ${r.rollNumber}` : ''}
+                </Text>
+                <Text style={[styles.outMeta, { color: C.mutedSoft }]}>
+                  {r.voucherCount} voucher{r.voucherCount === 1 ? '' : 's'}
+                  {r.oldestDueDate ? `  ·  oldest due ${formatDate(r.oldestDueDate)}` : ''}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.outAmount, { color: '#991b1b' }]}>
+                  {formatMoney(r.outstandingTotal)}
+                </Text>
+                <Feather name="chevron-right" size={16} color={C.mutedSoft} />
+              </View>
+            </Pressable>
+          ))}
+        </>
       )}
     </View>
   );
@@ -437,14 +498,19 @@ function DefaultersReport({ C }) {
   });
   const [to, setTo] = useState(todayYMD());
   const [minOutstanding, setMinOutstanding] = useState('');
+  const [page, setPage] = useState(1);
 
   const { data, isFetching } = useDefaultersReport({
     from,
     to,
     minOutstanding: minOutstanding || undefined,
+    page,
+    limit: REPORT_PAGE_SIZE,
     enabled: canView,
   });
-  const rows = data?.data?.defaulters || data?.data || [];
+  // { period, filters, totals, byBranch, page, limit, truncated, rows: [flat rows] }
+  const report = data?.data;
+  const rows = report?.rows || [];
 
   if (!canView) {
     return (
@@ -465,24 +531,36 @@ function DefaultersReport({ C }) {
             <Text style={[styles.label, { color: C.muted }]}>FROM *</Text>
             <TextInput
               value={from}
-              onChangeText={setFrom}
+              onChangeText={(v) => {
+                setFrom(v);
+                setPage(1);
+              }}
               placeholder="2026-04-01"
               placeholderTextColor={C.mutedSoft}
               keyboardType="numbers-and-punctuation"
               autoCapitalize="none"
-              style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+              style={[
+                styles.input,
+                { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+              ]}
             />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.label, { color: C.muted }]}>TO *</Text>
             <TextInput
               value={to}
-              onChangeText={setTo}
+              onChangeText={(v) => {
+                setTo(v);
+                setPage(1);
+              }}
               placeholder="2026-06-30"
               placeholderTextColor={C.mutedSoft}
               keyboardType="numbers-and-punctuation"
               autoCapitalize="none"
-              style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+              style={[
+                styles.input,
+                { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+              ]}
             />
           </View>
         </View>
@@ -490,7 +568,10 @@ function DefaultersReport({ C }) {
           <Text style={[styles.label, { color: C.muted }]}>MIN OUTSTANDING</Text>
           <TextInput
             value={minOutstanding}
-            onChangeText={(v) => setMinOutstanding(v.replace(/[^0-9.]/g, ''))}
+            onChangeText={(v) => {
+              setMinOutstanding(v.replace(/[^0-9.]/g, ''));
+              setPage(1);
+            }}
             keyboardType="decimal-pad"
             placeholder="e.g. 5000"
             placeholderTextColor={C.mutedSoft}
@@ -506,37 +587,55 @@ function DefaultersReport({ C }) {
       ) : rows.length === 0 ? (
         <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
           <Feather name="check-circle" size={28} color="#16a34a" />
-          <Text style={[styles.emptyText, { color: C.muted }]}>
-            No defaulters in this range.
-          </Text>
+          <Text style={[styles.emptyText, { color: C.muted }]}>No defaulters in this range.</Text>
         </View>
       ) : (
-        rows.map((r) => (
-          <Pressable
-            key={r._id || r.studentId}
-            onPress={() => router.push(`/(app)/fees/consolidated/${r._id || r.studentId}`)}
-            style={({ pressed }) => [
-              styles.outRow,
-              { backgroundColor: C.card, borderColor: C.border },
-              pressed && { opacity: 0.92 },
-            ]}
-          >
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.outName, { color: C.text }]} numberOfLines={1}>
-                {r.student?.user?.name || r.studentName || '—'}
-              </Text>
-              <Text style={[styles.outMeta, { color: C.muted }]} numberOfLines={1}>
-                {r.student?.admissionNumber || r.admissionNumber || '—'}
-              </Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.outAmount, { color: '#991b1b' }]}>
-                {formatMoney(r.outstandingTotal || r.totalDue)}
-              </Text>
-              <Feather name="chevron-right" size={16} color={C.mutedSoft} />
-            </View>
-          </Pressable>
-        ))
+        <>
+          <ReportPager
+            page={report?.page || page}
+            limit={report?.limit || REPORT_PAGE_SIZE}
+            shown={rows.length}
+            total={report?.totals?.studentCount}
+            truncated={report?.truncated}
+            onPage={setPage}
+            noun="students"
+            C={C}
+          />
+          {rows.map((r) => (
+            <Pressable
+              key={r.studentId}
+              onPress={() => router.push(`/(app)/fees/consolidated/${r.studentId}`)}
+              style={({ pressed }) => [
+                styles.outRow,
+                { backgroundColor: C.card, borderColor: C.border },
+                pressed && { opacity: 0.92 },
+              ]}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.outName, { color: C.text }]} numberOfLines={1}>
+                  {r.studentName || '—'}
+                </Text>
+                <Text style={[styles.outMeta, { color: C.muted }]} numberOfLines={1}>
+                  {r.admissionNumber || '—'}
+                  {r.className ? ` · ${r.className}` : ''}
+                  {r.sectionName ? ` ${r.sectionName}` : ''}
+                </Text>
+                {r.totalMonthsUnpaid ? (
+                  <Text style={[styles.outMeta, { color: C.mutedSoft }]}>
+                    {r.totalMonthsUnpaid} month{r.totalMonthsUnpaid === 1 ? '' : 's'} unpaid
+                    {r.oldestDueDate ? `  ·  oldest due ${formatDate(r.oldestDueDate)}` : ''}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.outAmount, { color: '#991b1b' }]}>
+                  {formatMoney(r.closingBalance)}
+                </Text>
+                <Feather name="chevron-right" size={16} color={C.mutedSoft} />
+              </View>
+            </Pressable>
+          ))}
+        </>
       )}
     </View>
   );

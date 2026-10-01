@@ -2,6 +2,30 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 
+/**
+ * Sections the caller may mark: [{ classId, sectionId, className, sectionName }].
+ * Resolves to `null` when the server doesn't have the endpoint yet (404), so the
+ * pickers fall back to listing every class/section.
+ */
+export function useMyAttendanceSections({ enabled = true } = {}) {
+  return useQuery({
+    queryKey: ['attendance-my-sections'],
+    queryFn: async () => {
+      try {
+        const { data } = await apiClient.get('/attendance/my-sections');
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : null;
+        return list;
+      } catch (err) {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
+    },
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 export function useSectionDaily({ classId, sectionId, date, enabled = true }) {
   return useQuery({
     queryKey: ['attendance-daily', classId, sectionId, date],
@@ -65,10 +89,9 @@ export function useStudentHistory({ studentId, from, to, enabled = true }) {
   return useQuery({
     queryKey: ['attendance-student-history', studentId, from, to],
     queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/attendance/student/${studentId}/history`,
-        { params: { from, to } },
-      );
+      const { data } = await apiClient.get(`/attendance/student/${studentId}/history`, {
+        params: { from, to },
+      });
       return data;
     },
     enabled: enabled && !!studentId && !!from && !!to,
@@ -80,10 +103,9 @@ export function useStudentSummary({ studentId, month, enabled = true }) {
   return useQuery({
     queryKey: ['attendance-student-summary', studentId, month],
     queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/attendance/student/${studentId}/summary`,
-        { params: { month } },
-      );
+      const { data } = await apiClient.get(`/attendance/student/${studentId}/summary`, {
+        params: { month },
+      });
       return data;
     },
     enabled: enabled && !!studentId && !!month,
@@ -109,8 +131,7 @@ export function useMarkAttendance({ onSuccess } = {}) {
       onSuccess?.(res?.data);
     },
     onError: (err) => {
-      const msg =
-        err?.response?.data?.message || err?.message || 'Could not save attendance';
+      const msg = err?.response?.data?.message || err?.message || 'Could not save attendance';
       Toast.show({ type: 'error', text1: 'Save failed', text2: msg });
     },
   });

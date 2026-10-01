@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -34,7 +27,11 @@ function Row({ label, value, valueColor, bold, divider, C }) {
     <View
       style={[
         styles.row,
-        divider && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border, paddingTop: 6 },
+        divider && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: C.border,
+          paddingTop: 6,
+        },
       ]}
     >
       <Text style={[styles.rowLabel, { color: C.text, fontWeight: bold ? '800' : '600' }]}>
@@ -70,10 +67,7 @@ export default function VoucherDetailPage() {
   ]);
   const canUpdate = hasAnyAction(user?.role, ['update-fee', 'update-all-branch-fee']);
   const canDelete = hasAnyAction(user?.role, ['delete-fee', 'delete-all-branch-fee']);
-  const canGenerate = hasAnyAction(user?.role, [
-    'generate-voucher',
-    'generate-all-branch-voucher',
-  ]);
+  const canGenerate = hasAnyAction(user?.role, ['generate-voucher', 'generate-all-branch-voucher']);
 
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
@@ -198,12 +192,7 @@ export default function VoucherDetailPage() {
             <Row label={`Discount (${v.discountApplied}%)`} value="applied" C={C} />
           )}
           {v.lateFee > 0 && (
-            <Row
-              label="Late Fee"
-              value={formatMoney(v.lateFee)}
-              valueColor="#991b1b"
-              C={C}
-            />
+            <Row label="Late Fee" value={formatMoney(v.lateFee)} valueColor="#991b1b" C={C} />
           )}
           <Row label="Paid" value={formatMoney(v.paidAmount)} valueColor="#166534" C={C} />
           <Row
@@ -232,7 +221,9 @@ export default function VoucherDetailPage() {
         {/* Payments history */}
         {(v.payments || []).length > 0 && (
           <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-            <Text style={[styles.section, { color: C.muted }]}>PAYMENTS ({(v.payments || []).length})</Text>
+            <Text style={[styles.section, { color: C.muted }]}>
+              PAYMENTS ({(v.payments || []).length})
+            </Text>
             {(v.payments || []).map((p) => (
               <View key={p._id} style={styles.paymentRow}>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -281,7 +272,8 @@ export default function VoucherDetailPage() {
                 <Text style={styles.actionBtnText}>Late Fee</Text>
               </Pressable>
             )}
-            {canGenerate && (v.paidAmount || 0) === 0 && (
+            {/* Regenerating voids the old voucher: server needs generate AND delete */}
+            {canGenerate && canDelete && (v.paidAmount || 0) === 0 && (
               <Pressable
                 onPress={() => setRegenOpen(true)}
                 style={({ pressed }) => [

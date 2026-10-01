@@ -17,8 +17,10 @@ import {
   useFinalizePayslip,
   usePayPayslip,
   usePayslipDetail,
+  useReversePayslipPayment,
   useUpdatePayslip,
 } from '../../../../../src/hooks/useStaffSalary';
+import { newIdempotencyKey } from '../../../../../src/utils/idempotency';
 import { useUserStore } from '../../../../../src/store/userStore';
 import {
   PAYMENT_METHODS,
@@ -74,7 +76,11 @@ function LineRow({ label, value, bold, divider, C }) {
     <View
       style={[
         styles.lineRow,
-        divider && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border, paddingTop: 6 },
+        divider && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: C.border,
+          paddingTop: 6,
+        },
       ]}
     >
       <Text style={[styles.lineLabel, { color: C.text, fontWeight: bold ? '800' : '600' }]}>
@@ -152,6 +158,8 @@ export default function PayslipDetailPage() {
   const canUpdate = hasAnyAction(user?.role, ['update-payslip', 'update-all-branch-payslip']);
   const canPay = hasAnyAction(user?.role, ['pay-payslip', 'pay-all-branch-payslip']);
   const canCancel = hasAnyAction(user?.role, ['cancel-payslip', 'cancel-all-branch-payslip']);
+  // Reversing an instalment undoes a payment: the server wants pay AND cancel.
+  const canReverse = canPay && canCancel;
 
   const [editing, setEditing] = useState(false);
   const [bonus, setBonus] = useState('');
@@ -160,6 +168,7 @@ export default function PayslipDetailPage() {
 
   const [showPay, setShowPay] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
+  const [reversing, setReversing] = useState(null);
 
   const update = useUpdatePayslip({
     id: payslipId,
@@ -389,26 +398,83 @@ export default function PayslipDetailPage() {
           )}
         </View>
 
-        {payslip.payments?.length > 1 && (
+        {Number(payslip.shortfall) > 0 && (
+          <View style={[styles.warnBox, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
+            <Feather name="alert-triangle" size={14} color="#92400e" />
+            <Text style={[styles.warnText, { color: '#92400e' }]}>
+              <Text style={{ fontWeight: '800' }}>
+                Shortfall {formatMoney(payslip.shortfall, cur)}:
+              </Text>{' '}
+              deductions exceeded gross pay by this much. Net salary is floored at 0 — the excess is
+              not carried forward automatically.
+            </Text>
+          </View>
+        )}
+
+        {payslip.payments?.length > 0 && (
           <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
             <Text style={[styles.fieldLabel, { color: C.muted }]}>
               PAYMENTS ({payslip.payments.length})
             </Text>
-            {payslip.payments.map((p, i) => (
-              <View
-                key={p._id || i}
-                style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}
-              >
-                <Text style={{ color: C.muted }}>
-                  #{i + 1} • {formatDate(p.paymentDate)} •{' '}
-                  {PAYMENT_METHOD_LABELS[p.paymentMethod] || p.paymentMethod || '—'}
-                </Text>
-                <Text style={{ color: C.text, fontWeight: '700' }}>
-                  {formatMoney(p.amount, cur)}
-                </Text>
-              </View>
-            ))}
+            {payslip.payments.map((p, i) => {
+              const reversed = !!p.reversedAt;
+              return (
+                <View key={p._id || i} style={{ paddingVertical: 4, gap: 2 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={[{ color: C.muted, flex: 1 }, reversed && styles.struck]}>
+                      #{i + 1} • {formatDate(p.paymentDate)} •{' '}
+                      {PAYMENT_METHOD_LABELS[p.paymentMethod] || p.paymentMethod || '—'}
+                    </Text>
+                    <Text
+                      style={[
+                        { color: reversed ? C.mutedSoft : C.text, fontWeight: '700' },
+                        reversed && styles.struck,
+                      ]}
+                    >
+                      {formatMoney(p.amount, cur)}
+                    </Text>
+                    {canReverse && !reversed && !isCancelled && !!p._id && (
+                      <Pressable
+                        onPress={() => setReversing(p)}
+                        hitSlop={6}
+                        style={({ pressed }) => [
+                          styles.smallBtn,
+                          { backgroundColor: '#fee2e2' },
+                          pressed && { opacity: 0.85 },
+                        ]}
+                      >
+                        <Feather name="rotate-ccw" size={11} color="#991b1b" />
+                        <Text style={[styles.smallBtnText, { color: '#991b1b' }]}>Reverse</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  {reversed && (
+                    <Text style={{ color: '#b91c1c', fontSize: 11 }}>
+                      Reversed {formatDate(p.reversedAt)}
+                      {p.reversalReason ? ` — ${p.reversalReason}` : ''}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
           </View>
+        )}
+
+        {reversing && (
+          <ReverseForm
+            payslip={payslip}
+            payment={reversing}
+            cur={cur}
+            onClose={() => setReversing(null)}
+            C={C}
+          />
         )}
 
         {editing && (
@@ -469,7 +535,12 @@ export default function PayslipDetailPage() {
             <Text style={[styles.sectionTitle, { color: C.text }]}>Attendance Snapshot</Text>
             <View style={styles.snapGrid}>
               <SnapStat label="Working" value={payslip.attendance.workingDays} C={C} />
-              <SnapStat label="Present" value={payslip.attendance.presentDays} tone="success" C={C} />
+              <SnapStat
+                label="Present"
+                value={payslip.attendance.presentDays}
+                tone="success"
+                C={C}
+              />
               <SnapStat label="Late" value={payslip.attendance.lateDays} C={C} />
               <SnapStat label="Half" value={payslip.attendance.halfDays} C={C} />
               <SnapStat label="Paid Leave" value={payslip.attendance.paidLeaveDays} C={C} />
@@ -481,7 +552,12 @@ export default function PayslipDetailPage() {
               />
               <SnapStat label="Absent" value={payslip.attendance.absentDays} tone="danger" C={C} />
               <SnapStat label="Holiday" value={payslip.attendance.holidayDays} C={C} />
-              <SnapStat label="Days Paid" value={payslip.attendance.daysPaid} tone="success" C={C} />
+              <SnapStat
+                label="Days Paid"
+                value={payslip.attendance.daysPaid}
+                tone="success"
+                C={C}
+              />
             </View>
           </View>
         )}
@@ -490,12 +566,7 @@ export default function PayslipDetailPage() {
           <PolicySnapshotBlock snapshot={payslip.policySnapshot} C={C} />
         ) : (
           payslip.attendance && (
-            <View
-              style={[
-                styles.warnBox,
-                { backgroundColor: '#fef3c7', borderColor: '#fde68a' },
-              ]}
-            >
+            <View style={[styles.warnBox, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
               <Feather name="alert-triangle" size={14} color="#92400e" />
               <Text style={[styles.warnText, { color: '#92400e' }]}>
                 No salary policy was active at generation time — pro-rate fallback used (basic ÷
@@ -575,20 +646,8 @@ export default function PayslipDetailPage() {
           </View>
         )}
 
-        {showPay && (
-          <PayForm
-            payslip={payslip}
-            onClose={() => setShowPay(false)}
-            C={C}
-          />
-        )}
-        {showCancel && (
-          <CancelForm
-            payslip={payslip}
-            onClose={() => setShowCancel(false)}
-            C={C}
-          />
-        )}
+        {showPay && <PayForm payslip={payslip} onClose={() => setShowPay(false)} C={C} />}
+        {showCancel && <CancelForm payslip={payslip} onClose={() => setShowCancel(false)} C={C} />}
       </ScrollView>
     </View>
   );
@@ -602,6 +661,8 @@ function PayForm({ payslip, onClose, C }) {
   const remaining = payslip.balanceAmount ?? payslip.netSalary ?? 0;
   const [paidAmount, setPaidAmount] = useState(String(remaining));
   const [notes, setNotes] = useState('');
+  // One key per opened form, reused if Confirm is retried after a network error.
+  const [idempotencyKey] = useState(() => newIdempotencyKey());
 
   const pay = usePayPayslip({ id: payslip._id, onSuccess: () => onClose() });
 
@@ -630,7 +691,7 @@ function PayForm({ payslip, onClose, C }) {
       payload.paidAmount = amount;
     }
     if (notes.trim()) payload.notes = notes.trim();
-    pay.mutate(payload);
+    pay.mutate({ ...payload, idempotencyKey });
   };
 
   return (
@@ -687,13 +748,7 @@ function PayForm({ payslip, onClose, C }) {
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.chipText,
-                    { color: C.text },
-                    active && styles.chipTextActive,
-                  ]}
-                >
+                <Text style={[styles.chipText, { color: C.text }, active && styles.chipTextActive]}>
                   {PAYMENT_METHOD_LABELS[m]}
                 </Text>
               </Pressable>
@@ -712,10 +767,7 @@ function PayForm({ payslip, onClose, C }) {
           onChangeText={setPaymentReference}
           placeholder="TXN-12345"
           placeholderTextColor={C.mutedSoft}
-          style={[
-            styles.input,
-            { color: C.text, borderColor: C.border, backgroundColor: C.card },
-          ]}
+          style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.card }]}
         />
       </View>
 
@@ -768,6 +820,70 @@ function PayForm({ payslip, onClose, C }) {
   );
 }
 
+function ReverseForm({ payslip, payment, cur, onClose, C }) {
+  const [reason, setReason] = useState('');
+  const reverse = useReversePayslipPayment({ id: payslip._id, onSuccess: () => onClose() });
+
+  const submit = () => {
+    if (!reason.trim()) {
+      Toast.show({ type: 'error', text1: 'Reason is required' });
+      return;
+    }
+    reverse.mutate({ paymentId: payment._id, reason: reason.trim() });
+  };
+
+  return (
+    <View style={[styles.formCard, { borderColor: '#fecaca', backgroundColor: '#fef2f2' }]}>
+      <Text style={[styles.formTitle, { color: '#991b1b' }]}>
+        Reverse {formatMoney(payment.amount, cur)} paid {formatDate(payment.paymentDate)}
+      </Text>
+      <Text style={{ color: '#991b1b', fontSize: 12 }}>
+        The instalment stays on record but stops counting toward the paid amount.
+      </Text>
+      <View>
+        <Text style={[styles.fieldLabel, { color: C.muted }]}>REASON *</Text>
+        <TextInput
+          value={reason}
+          onChangeText={setReason}
+          placeholder="Wrong amount, bounced transfer, etc."
+          placeholderTextColor={C.mutedSoft}
+          style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.card }]}
+        />
+      </View>
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={onClose}
+          style={({ pressed }) => [
+            styles.ghostBtn,
+            { borderColor: C.border, backgroundColor: C.card },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={[styles.ghostBtnText, { color: C.text }]}>Back</Text>
+        </Pressable>
+        <Pressable
+          onPress={submit}
+          disabled={reverse.isPending}
+          style={({ pressed }) => [
+            styles.actionBtn,
+            { backgroundColor: '#b91c1c', flex: 1 },
+            (reverse.isPending || pressed) && { opacity: 0.85 },
+          ]}
+        >
+          {reverse.isPending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Feather name="rotate-ccw" size={14} color="#fff" />
+              <Text style={styles.actionBtnText}>Confirm Reverse</Text>
+            </>
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function CancelForm({ payslip, onClose, C }) {
   const [reason, setReason] = useState('');
   const cancel = useCancelPayslip({ id: payslip._id, onSuccess: () => onClose() });
@@ -790,10 +906,7 @@ function CancelForm({ payslip, onClose, C }) {
           onChangeText={setReason}
           placeholder="Duplicate, error, etc."
           placeholderTextColor={C.mutedSoft}
-          style={[
-            styles.input,
-            { color: C.text, borderColor: C.border, backgroundColor: C.card },
-          ]}
+          style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.card }]}
         />
       </View>
       <View style={styles.actionsRow}>
@@ -983,6 +1096,8 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: COLORS.brand, borderColor: COLORS.brand },
   chipText: { fontSize: 11, fontWeight: '600' },
   chipTextActive: { color: '#fff' },
+
+  struck: { textDecorationLine: 'line-through' },
 
   formCard: { borderRadius: 14, padding: 12, borderWidth: 1, gap: 10 },
   formTitle: { fontSize: 14, fontWeight: '800' },

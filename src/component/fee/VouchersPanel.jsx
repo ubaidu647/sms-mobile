@@ -13,11 +13,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useUserStore } from '../../store/userStore';
 import { useBranchesDropdown } from '../../hooks/useBranchProfilesList';
-import {
-  useClassesForFee,
-  useSectionsForFee,
-  useVouchersList,
-} from '../../hooks/useFees';
+import { useClassesForFee, useSectionsForFee, useVouchersList } from '../../hooks/useFees';
 import {
   VOUCHER_STATUSES,
   VOUCHER_STATUS_PILL,
@@ -95,10 +91,7 @@ function VoucherCard({ v, onTap, C }) {
         <View style={styles.amountBlock}>
           <Text style={[styles.amountLabel, { color: C.mutedSoft }]}>BALANCE</Text>
           <Text
-            style={[
-              styles.amountValue,
-              { color: v.balanceAmount > 0 ? '#991b1b' : C.text },
-            ]}
+            style={[styles.amountValue, { color: v.balanceAmount > 0 ? '#991b1b' : C.text }]}
             numberOfLines={1}
           >
             {formatMoney(v.balanceAmount)}
@@ -107,9 +100,7 @@ function VoucherCard({ v, onTap, C }) {
       </View>
 
       <View style={styles.footerRow}>
-        <Text style={[styles.dueText, { color: C.mutedSoft }]}>
-          Due {formatDate(v.dueDate)}
-        </Text>
+        <Text style={[styles.dueText, { color: C.mutedSoft }]}>Due {formatDate(v.dueDate)}</Text>
         {v.lateFee > 0 && (
           <View style={[styles.lateFeePill, { backgroundColor: '#fee2e2' }]}>
             <Feather name="alert-octagon" size={10} color="#991b1b" />
@@ -132,10 +123,10 @@ export default function VouchersPanel() {
   const isOrgLevel = scope === 'all';
   const isOwnOnly = scope === 'own';
 
-  const canGenerate = hasAnyAction(user?.role, [
-    'generate-voucher',
-    'generate-all-branch-voucher',
-  ]);
+  const canGenerate = hasAnyAction(user?.role, ['generate-voucher', 'generate-all-branch-voucher']);
+  // Regenerating voids the old vouchers, so the server also wants the delete action.
+  const canRegenerate =
+    canGenerate && hasAnyAction(user?.role, ['delete-fee', 'delete-all-branch-fee']);
 
   const userBranchId =
     (typeof user?.branchId === 'string' && user.branchId) ||
@@ -264,10 +255,7 @@ export default function VouchersPanel() {
               setGenSectionMode('generate');
               setGenSectionOpen(true);
             }}
-            style={({ pressed }) => [
-              styles.actionBtnPrimary,
-              pressed && { opacity: 0.9 },
-            ]}
+            style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.9 }]}
           >
             <Feather name="plus" size={16} color="#fff" />
             <Text style={styles.actionBtnPrimaryText}>Generate</Text>
@@ -288,20 +276,24 @@ export default function VouchersPanel() {
             <Feather name="user-plus" size={14} color="#0f766e" />
             <Text style={[styles.secondaryBtnText, { color: '#0f766e' }]}>Single Student</Text>
           </Pressable>
-          <Pressable
-            onPress={() => {
-              setGenSectionMode('regenerate');
-              setGenSectionOpen(true);
-            }}
-            style={({ pressed }) => [
-              styles.secondaryBtn,
-              { borderColor: '#fde68a', backgroundColor: '#fffbeb' },
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <Feather name="refresh-cw" size={14} color="#92400e" />
-            <Text style={[styles.secondaryBtnText, { color: '#92400e' }]}>Regenerate Section</Text>
-          </Pressable>
+          {canRegenerate && (
+            <Pressable
+              onPress={() => {
+                setGenSectionMode('regenerate');
+                setGenSectionOpen(true);
+              }}
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                { borderColor: '#fde68a', backgroundColor: '#fffbeb' },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Feather name="refresh-cw" size={14} color="#92400e" />
+              <Text style={[styles.secondaryBtnText, { color: '#92400e' }]}>
+                Regenerate Section
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -328,7 +320,10 @@ export default function VouchersPanel() {
               onChangeText={setDraftSearch}
               placeholder="Voucher / student / admission"
               placeholderTextColor={C.mutedSoft}
-              style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+              style={[
+                styles.input,
+                { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+              ]}
               onSubmitEditing={applyFilters}
             />
           </View>
@@ -343,7 +338,10 @@ export default function VouchersPanel() {
                 placeholderTextColor={C.mutedSoft}
                 keyboardType="numbers-and-punctuation"
                 autoCapitalize="none"
-                style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                style={[
+                  styles.input,
+                  { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                ]}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -355,7 +353,10 @@ export default function VouchersPanel() {
                 placeholderTextColor={C.mutedSoft}
                 keyboardType="numbers-and-punctuation"
                 autoCapitalize="none"
-                style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                style={[
+                  styles.input,
+                  { color: C.text, borderColor: C.border, backgroundColor: C.bg },
+                ]}
               />
             </View>
           </View>
@@ -396,11 +397,7 @@ export default function VouchersPanel() {
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.chipText,
-                        { color: C.text },
-                        active && styles.chipTextActive,
-                      ]}
+                      style={[styles.chipText, { color: C.text }, active && styles.chipTextActive]}
                     >
                       {titleCase(s)}
                     </Text>
@@ -676,10 +673,7 @@ export default function VouchersPanel() {
         mode={genSectionMode}
         onClose={() => setGenSectionOpen(false)}
       />
-      <GenerateStudentModal
-        open={genStudentOpen}
-        onClose={() => setGenStudentOpen(false)}
-      />
+      <GenerateStudentModal open={genStudentOpen} onClose={() => setGenStudentOpen(false)} />
       <StudentPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} />
     </View>
   );

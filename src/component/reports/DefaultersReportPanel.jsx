@@ -20,20 +20,13 @@ import { useUserStore } from '../../store/userStore';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import { hasAnyAction } from '../../utils/permissions';
+import ReportPager from '../ReportPager';
 import { useBranchesDropdown } from '../../hooks/useBranchProfilesList';
-import {
-  useDefaultersReport,
-} from '../../hooks/useFees';
-import {
-  useClassesForFee,
-  useSectionsForFee,
-} from '../../hooks/useFees';
-import {
-  formatDate,
-  formatMoney,
-  formatMonth,
-  todayYMD,
-} from '../../constants/fee';
+import { useDefaultersReport } from '../../hooks/useFees';
+import { useClassesForFee, useSectionsForFee } from '../../hooks/useFees';
+import { formatDate, formatMoney, formatMonth, todayYMD } from '../../constants/fee';
+
+const REPORT_PAGE_SIZE = 100;
 
 function firstOfMonth() {
   const d = new Date();
@@ -63,6 +56,7 @@ export default function DefaultersReportPanel() {
   const [filterError, setFilterError] = useState('');
   const [expanded, setExpanded] = useState(() => new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: branchData } = useBranchesDropdown({ enabled: canPickBranches });
   const branches = branchData?.data || [];
@@ -74,7 +68,11 @@ export default function DefaultersReportPanel() {
   const { data: sectionsData } = useSectionsForFee({ classId: draftClassId });
   const sections = sectionsData?.data || [];
 
-  const { data: reportEnvelope, isFetching, refetch } = useDefaultersReport({
+  const {
+    data: reportEnvelope,
+    isFetching,
+    refetch,
+  } = useDefaultersReport({
     branchIds: applied?.branchIds,
     classId: applied?.classId,
     sectionId: applied?.sectionId,
@@ -82,6 +80,8 @@ export default function DefaultersReportPanel() {
     to: applied?.to,
     minOutstanding: applied?.minOutstanding,
     includeDetails: applied?.includeDetails,
+    page,
+    limit: REPORT_PAGE_SIZE,
     enabled: !!applied,
   });
 
@@ -106,6 +106,7 @@ export default function DefaultersReportPanel() {
       return;
     }
     setExpanded(new Set());
+    setPage(1);
     setApplied({
       from: draftFrom,
       to: draftTo,
@@ -127,14 +128,13 @@ export default function DefaultersReportPanel() {
     setDraftMinOutstanding('');
     setDraftIncludeDetails(false);
     setApplied(null);
+    setPage(1);
     setExpanded(new Set());
     setFilterError('');
   };
 
   const toggleBranch = (id) =>
-    setDraftBranchIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setDraftBranchIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const toggleExpand = (studentId) =>
     setExpanded((prev) => {
@@ -155,6 +155,12 @@ export default function DefaultersReportPanel() {
     lines.push(['Student Fee Defaulters Statement']);
     lines.push([`Period: ${formatDate(report.period.from)} to ${formatDate(report.period.to)}`]);
     lines.push([`Branches: ${(totals?.branchesCovered || []).join(', ') || 'All'}`]);
+    if (report.truncated || (report.page || 1) > 1) {
+      const start = ((report.page || 1) - 1) * (report.limit || rows.length) + 1;
+      lines.push([
+        `Rows ${start}-${start + rows.length - 1} of ${totals?.studentCount ?? rows.length} (one page; totals cover all)`,
+      ]);
+    }
     lines.push([]);
     lines.push([
       'S/N',
@@ -246,18 +252,6 @@ export default function DefaultersReportPanel() {
     }
   };
 
-  if (!canRun) {
-    return (
-      <View style={styles.center}>
-        <Feather name="lock" size={36} color={COLORS.red || '#dc2626'} />
-        <Text style={[styles.lockTitle, { color: C.text }]}>No access</Text>
-        <Text style={[styles.lockSub, { color: C.muted, textAlign: 'center' }]}>
-          You don't have permission to view this report.
-        </Text>
-      </View>
-    );
-  }
-
   const activeFiltersSummary = useMemo(() => {
     const parts = [];
     if (applied?.from && applied?.to) parts.push(`${applied.from} → ${applied.to}`);
@@ -275,6 +269,18 @@ export default function DefaultersReportPanel() {
     if (applied?.includeDetails) parts.push('w/ details');
     return parts.join(' · ');
   }, [applied, branches, classes]);
+
+  if (!canRun) {
+    return (
+      <View style={styles.center}>
+        <Feather name="lock" size={36} color={COLORS.red || '#dc2626'} />
+        <Text style={[styles.lockTitle, { color: C.text }]}>No access</Text>
+        <Text style={[styles.lockSub, { color: C.muted, textAlign: 'center' }]}>
+          You don't have permission to view this report.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -343,13 +349,22 @@ export default function DefaultersReportPanel() {
           data={rows}
           keyExtractor={(it) => it.studentId}
           ListHeaderComponent={
-            <Header
-              report={report}
-              totals={totals}
-              byBranch={byBranch}
-              rows={rows}
-              C={C}
-            />
+            <View style={{ gap: 12 }}>
+              <Header report={report} totals={totals} byBranch={byBranch} rows={rows} C={C} />
+              <ReportPager
+                page={report?.page || page}
+                limit={report?.limit || REPORT_PAGE_SIZE}
+                shown={rows.length}
+                total={totals?.studentCount}
+                truncated={report?.truncated}
+                onPage={(p) => {
+                  setExpanded(new Set());
+                  setPage(p);
+                }}
+                noun="students"
+                C={C}
+              />
+            </View>
           }
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -361,9 +376,7 @@ export default function DefaultersReportPanel() {
               isOpen={expanded.has(r.studentId)}
               showDetails={applied?.includeDetails}
               onToggle={() => toggleExpand(r.studentId)}
-              onOpenSlip={() =>
-                router.push(`/(app)/fees/consolidated/${r.studentId}`)
-              }
+              onOpenSlip={() => router.push(`/(app)/fees/consolidated/${r.studentId}`)}
               C={C}
             />
           )}
@@ -431,21 +444,9 @@ function Header({ report, totals, byBranch, rows, C }) {
         </View>
 
         <View style={styles.summaryRow}>
-          <SummaryCard
-            label="Opening"
-            value={totals?.openingTotal}
-            tone="amber"
-          />
-          <SummaryCard
-            label="Current"
-            value={totals?.currentPeriodTotal}
-            tone="blue"
-          />
-          <SummaryCard
-            label="Closing"
-            value={totals?.closingTotal}
-            tone="red"
-          />
+          <SummaryCard label="Opening" value={totals?.openingTotal} tone="amber" />
+          <SummaryCard label="Current" value={totals?.currentPeriodTotal} tone="blue" />
+          <SummaryCard label="Closing" value={totals?.closingTotal} tone="red" />
         </View>
       </View>
 
@@ -482,7 +483,8 @@ function Header({ report, totals, byBranch, rows, C }) {
       )}
 
       <Text style={[styles.listLabel, { color: C.muted }]}>
-        DEFAULTER LIST  ·  {rows.length}
+        DEFAULTER LIST · {rows.length}
+        {totals?.studentCount > rows.length ? ` of ${totals.studentCount}` : ''}
       </Text>
     </View>
   );
@@ -551,7 +553,13 @@ function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
       )}
 
       <View style={[styles.balanceGrid, { borderTopColor: C.border }]}>
-        <Bal label="Opening" amount={r.openingBalance} months={r.openingMonthsCount} tone="#d97706" C={C} />
+        <Bal
+          label="Opening"
+          amount={r.openingBalance}
+          months={r.openingMonthsCount}
+          tone="#d97706"
+          C={C}
+        />
         <Bal
           label="Current"
           amount={r.currentPeriodOutstanding}
@@ -600,7 +608,10 @@ function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
             </Text>
           ) : (
             r.vouchers.map((v) => (
-              <View key={v._id} style={[styles.voucherRow, { backgroundColor: C.card, borderColor: C.border }]}>
+              <View
+                key={v._id}
+                style={[styles.voucherRow, { backgroundColor: C.card, borderColor: C.border }]}
+              >
                 <View style={styles.voucherTopRow}>
                   <View
                     style={[
@@ -625,7 +636,7 @@ function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
                 </View>
                 <View style={styles.voucherDetail}>
                   <Text style={[styles.voucherSmall, { color: C.muted }]}>
-                    {formatMonth(v.month)}  ·  Due {formatDate(v.dueDate)}
+                    {formatMonth(v.month)} · Due {formatDate(v.dueDate)}
                   </Text>
                 </View>
                 <View style={styles.voucherAmounts}>
@@ -650,15 +661,15 @@ function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
 
 function Bal({ label, amount, months, tone, big, C }) {
   return (
-    <View style={[styles.balCell, big && { borderLeftWidth: 3, borderLeftColor: tone, paddingLeft: 8 }]}>
+    <View
+      style={[styles.balCell, big && { borderLeftWidth: 3, borderLeftColor: tone, paddingLeft: 8 }]}
+    >
       <Text style={[styles.balLabel, { color: C.mutedSoft }]}>{label.toUpperCase()}</Text>
       <Text style={[styles.balValue, { color: tone, fontSize: big ? 15 : 13 }]}>
         {formatMoney(amount)}
       </Text>
       {months != null && (
-        <Text style={[styles.balMonths, { color: C.mutedSoft }]}>
-          {months} mo
-        </Text>
+        <Text style={[styles.balMonths, { color: C.mutedSoft }]}>{months} mo</Text>
       )}
     </View>
   );
@@ -693,20 +704,34 @@ function FiltersModal({
   C,
 }) {
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={open}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <View style={[styles.modalSafe, { backgroundColor: C.bg }]}>
-        <View style={[styles.modalHeader, { backgroundColor: C.card, borderBottomColor: C.border }]}>
+        <View
+          style={[styles.modalHeader, { backgroundColor: C.card, borderBottomColor: C.border }]}
+        >
           <Text style={[styles.modalTitle, { color: C.text }]}>Defaulters Filters</Text>
           <Pressable
             onPress={onClose}
             hitSlop={10}
-            style={({ pressed }) => [styles.modalClose, { backgroundColor: C.bg }, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [
+              styles.modalClose,
+              { backgroundColor: C.bg },
+              pressed && { opacity: 0.6 },
+            ]}
           >
             <Feather name="x" size={18} color={C.text} />
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{ padding: 16, gap: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
           {!!filterError && (
             <View style={styles.errorBox}>
               <Feather name="alert-triangle" size={14} color="#dc2626" />
@@ -724,7 +749,10 @@ function FiltersModal({
                 placeholderTextColor={C.mutedSoft}
                 keyboardType="numbers-and-punctuation"
                 autoCapitalize="none"
-                style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.card }]}
+                style={[
+                  styles.input,
+                  { color: C.text, borderColor: C.border, backgroundColor: C.card },
+                ]}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -736,7 +764,10 @@ function FiltersModal({
                 placeholderTextColor={C.mutedSoft}
                 keyboardType="numbers-and-punctuation"
                 autoCapitalize="none"
-                style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.card }]}
+                style={[
+                  styles.input,
+                  { color: C.text, borderColor: C.border, backgroundColor: C.card },
+                ]}
               />
             </View>
           </View>
@@ -825,7 +856,10 @@ function FiltersModal({
               placeholder="0"
               placeholderTextColor={C.mutedSoft}
               keyboardType="number-pad"
-              style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.card }]}
+              style={[
+                styles.input,
+                { color: C.text, borderColor: C.border, backgroundColor: C.card },
+              ]}
             />
           </View>
 
@@ -895,11 +929,7 @@ function ChipGroup({ label, options, value, onChange, C }) {
               ]}
             >
               <Text
-                style={[
-                  styles.fchipText,
-                  { color: C.text },
-                  active && styles.fchipTextActive,
-                ]}
+                style={[styles.fchipText, { color: C.text }, active && styles.fchipTextActive]}
                 numberOfLines={1}
               >
                 {opt.label}
@@ -980,7 +1010,12 @@ const styles = StyleSheet.create({
 
   summaryRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   summaryCard: { flex: 1, padding: 10, borderRadius: 10 },
-  summaryLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 9, letterSpacing: 1.2, fontWeight: '800' },
+  summaryLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 9,
+    letterSpacing: 1.2,
+    fontWeight: '800',
+  },
   summaryValue: { color: '#fff', fontSize: 15, fontWeight: '800', marginTop: 4 },
 
   sectionTitle: { fontSize: 10, letterSpacing: 1.1, fontWeight: '800', marginBottom: 8 },

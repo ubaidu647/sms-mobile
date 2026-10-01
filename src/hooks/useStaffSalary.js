@@ -2,12 +2,27 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
+import { idempotencyHeaders } from '../utils/idempotency';
 
 // ────────────── Salary Structures ──────────────
 
-export function useStructuresList({ page = 1, limit = 20, staffId, branchId, isActive, enabled = true }) {
+export function useStructuresList({
+  page = 1,
+  limit = 20,
+  staffId,
+  branchId,
+  isActive,
+  enabled = true,
+}) {
   return useQuery({
-    queryKey: ['staff-salary-structures', page, limit, staffId || '', branchId || '', isActive ?? ''],
+    queryKey: [
+      'staff-salary-structures',
+      page,
+      limit,
+      staffId || '',
+      branchId || '',
+      isActive ?? '',
+    ],
     queryFn: () => {
       const params = {};
       if (staffId) params.staffId = staffId;
@@ -157,13 +172,18 @@ export function useBranchPayslipSummary({ branchId, month, enabled = true }) {
   });
 }
 
-export function useStaffPayslipHistory({ staffId, enabled = true }) {
+// Server pages history (max 120 per page); the envelope's `total` is the full
+// count so callers can show "showing X of Y" and page through the rest.
+export function useStaffPayslipHistory({ staffId, page = 1, limit = 24, enabled = true }) {
   return useQuery({
-    queryKey: ['payslip-history', staffId],
+    queryKey: ['payslip-history', staffId, page, limit],
     queryFn: async () => {
-      const { data } = await apiClient.get(`/staff-salary/payslip/staff/${staffId}/history`);
+      const { data } = await apiClient.get(`/staff-salary/payslip/staff/${staffId}/history`, {
+        params: { page, limit },
+      });
       return data;
     },
+    placeholderData: keepPreviousData,
     enabled: enabled && !!staffId,
     staleTime: 30_000,
   });
@@ -260,8 +280,13 @@ export function useFinalizePayslip({ id, onSuccess } = {}) {
 export function usePayPayslip({ id, onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post(`/staff-salary/payslip/${id}/pay`, payload);
+    // `idempotencyKey` (one per opened pay form) travels as a header, not in the body
+    mutationFn: async ({ idempotencyKey, ...payload }) => {
+      const { data } = await apiClient.post(
+        `/staff-salary/payslip/${id}/pay`,
+        payload,
+        idempotencyHeaders(idempotencyKey),
+      );
       return data;
     },
     onSuccess: (res) => {
@@ -274,6 +299,31 @@ export function usePayPayslip({ id, onSuccess } = {}) {
     onError: (err) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to mark paid';
       Toast.show({ type: 'error', text1: 'Failed', text2: msg });
+    },
+  });
+}
+
+export function useReversePayslipPayment({ id, onSuccess } = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ paymentId, reason }) => {
+      const { data } = await apiClient.post(
+        `/staff-salary/payslip/${id}/payments/${paymentId}/reverse`,
+        { reason },
+      );
+      return data;
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['payslips'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
+      Toast.show({ type: 'success', text1: res?.message || 'Payment reversed' });
+      onSuccess?.(res?.data);
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.message || err?.message || 'Reverse failed';
+      Toast.show({ type: 'error', text1: 'Reverse failed', text2: msg });
     },
   });
 }

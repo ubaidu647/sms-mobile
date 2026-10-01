@@ -11,10 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AttendancePickers from './AttendancePickers';
-import {
-  useSectionDaily,
-  useMarkAttendance,
-} from '../../hooks/useAttendance';
+import { useSectionDaily, useMarkAttendance } from '../../hooks/useAttendance';
 import {
   ATTENDANCE_STATUSES,
   STATUS_PILL,
@@ -38,9 +35,7 @@ function StatusButton({ statusKey, active, onPress }) {
       ]}
     >
       <Feather name={c.icon} size={13} color={active ? '#fff' : c.fg} />
-      <Text style={[styles.statusBtnText, { color: active ? '#fff' : c.fg }]}>
-        {c.label}
-      </Text>
+      <Text style={[styles.statusBtnText, { color: active ? '#fff' : c.fg }]}>{c.label}</Text>
     </Pressable>
   );
 }
@@ -55,12 +50,7 @@ function SummaryStrip({ summary, total, C }) {
     { key: 'leave', count: summary.leave },
   ];
   return (
-    <View
-      style={[
-        styles.summaryCard,
-        { backgroundColor: C.card, borderColor: C.border },
-      ]}
-    >
+    <View style={[styles.summaryCard, { backgroundColor: C.card, borderColor: C.border }]}>
       <View style={styles.summaryHeader}>
         <Text style={[styles.summaryTitle, { color: C.text }]}>Today's snapshot</Text>
         {summary.unmarked === 0 ? (
@@ -79,10 +69,7 @@ function SummaryStrip({ summary, total, C }) {
         {items.map((i) => {
           const c = STATUS_PILL[i.key];
           return (
-            <View
-              key={i.key}
-              style={[styles.summaryTile, { backgroundColor: c.bg }]}
-            >
+            <View key={i.key} style={[styles.summaryTile, { backgroundColor: c.bg }]}>
               <View style={[styles.summaryIcon, { backgroundColor: c.solid }]}>
                 <Feather name={c.icon} size={12} color="#fff" />
               </View>
@@ -147,8 +134,7 @@ export default function MarkAttendancePanel({ canMark }) {
     setEdits(seed);
   }, [data]);
 
-  const setRow = (id, patch) =>
-    setEdits((s) => ({ ...s, [id]: { ...(s[id] || {}), ...patch } }));
+  const setRow = (id, patch) => setEdits((s) => ({ ...s, [id]: { ...(s[id] || {}), ...patch } }));
 
   const setAll = (status) => {
     const next = { ...edits };
@@ -186,6 +172,7 @@ export default function MarkAttendancePanel({ canMark }) {
       keyboardShouldPersistTaps="handled"
     >
       <AttendancePickers
+        markableOnly
         branchId={branchId}
         setBranchId={setBranchId}
         academicYear={academicYear}
@@ -223,9 +210,24 @@ export default function MarkAttendancePanel({ canMark }) {
 
           {canMark && (
             <View style={styles.bulkRow}>
-              <BulkBtn icon="check-circle" label="All Present" color="#10b981" onPress={() => setAll('present')} />
-              <BulkBtn icon="x-circle" label="All Absent" color="#ef4444" onPress={() => setAll('absent')} />
-              <BulkBtn icon="sun" label="Holiday" color="#06b6d4" onPress={() => setAll('holiday')} />
+              <BulkBtn
+                icon="check-circle"
+                label="All Present"
+                color="#10b981"
+                onPress={() => setAll('present')}
+              />
+              <BulkBtn
+                icon="x-circle"
+                label="All Absent"
+                color="#ef4444"
+                onPress={() => setAll('absent')}
+              />
+              <BulkBtn
+                icon="sun"
+                label="Holiday"
+                color="#06b6d4"
+                onPress={() => setAll('holiday')}
+              />
             </View>
           )}
 
@@ -262,9 +264,7 @@ export default function MarkAttendancePanel({ canMark }) {
                   {!!status && (
                     <View style={[styles.currentPill, { backgroundColor: c.bg }]}>
                       <Feather name={c.icon} size={11} color={c.fg} />
-                      <Text style={[styles.currentPillText, { color: c.fg }]}>
-                        {c.label}
-                      </Text>
+                      <Text style={[styles.currentPillText, { color: c.fg }]}>{c.label}</Text>
                     </View>
                   )}
                 </View>

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useRecordPayment } from '../../hooks/useFees';
+import { newIdempotencyKey } from '../../utils/idempotency';
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -34,6 +35,13 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState(null);
+  // One key per opened modal, reused on retries so a resubmit can't double-record.
+  const [idempotencyKey, setIdempotencyKey] = useState(null);
+
+  // Keyed on `open` alone so a voucher refetch while open can't mint a new key.
+  useEffect(() => {
+    if (open) setIdempotencyKey(newIdempotencyKey());
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -78,7 +86,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
     };
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();
     if (notes.trim()) payload.notes = notes.trim();
-    mut.mutate(payload);
+    mut.mutate({ ...payload, idempotencyKey });
   };
 
   if (!voucher) return null;
@@ -124,19 +132,17 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
             showsVerticalScrollIndicator={false}
           >
             {receipt ? (
-              <View style={[styles.receiptCard, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+              <View
+                style={[styles.receiptCard, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}
+              >
                 <View style={styles.receiptIcon}>
                   <Feather name="check-circle" size={32} color="#fff" />
                 </View>
                 <Text style={styles.receiptTitle}>Payment Recorded</Text>
-                <Text style={styles.receiptNum}>
-                  {receipt?.payment?.receiptNumber || ''}
-                </Text>
+                <Text style={styles.receiptNum}>{receipt?.payment?.receiptNumber || ''}</Text>
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Amount</Text>
-                  <Text style={styles.receiptValue}>
-                    {formatMoney(receipt?.payment?.amount)}
-                  </Text>
+                  <Text style={styles.receiptValue}>{formatMoney(receipt?.payment?.amount)}</Text>
                 </View>
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Method</Text>

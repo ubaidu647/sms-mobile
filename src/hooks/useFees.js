@@ -2,16 +2,11 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
+import { idempotencyHeaders } from '../utils/idempotency';
 
 // ────────────── Fee Structures ──────────────
 
-export function useFeeStructuresList({
-  page = 1,
-  limit = 20,
-  filters,
-  branchId,
-  enabled = true,
-}) {
+export function useFeeStructuresList({ page = 1, limit = 20, filters, branchId, enabled = true }) {
   const params = {
     classId: filters?.classId || undefined,
     academicYear: filters?.academicYear || undefined,
@@ -98,13 +93,7 @@ export function useDeleteFeeStructure({ onSuccess } = {}) {
 
 // ────────────── Vouchers ──────────────
 
-export function useVouchersList({
-  page = 1,
-  limit = 20,
-  filters,
-  branchId,
-  enabled = true,
-}) {
+export function useVouchersList({ page = 1, limit = 20, filters, branchId, enabled = true }) {
   const params = {
     classId: filters?.classId || undefined,
     sectionId: filters?.sectionId || undefined,
@@ -262,13 +251,7 @@ export function useAddLateFee({ id, onSuccess } = {}) {
 
 // ────────────── Payments ──────────────
 
-export function usePaymentsList({
-  page = 1,
-  limit = 20,
-  filters,
-  branchId,
-  enabled = true,
-}) {
+export function usePaymentsList({ page = 1, limit = 20, filters, branchId, enabled = true }) {
   const params = {
     voucherId: filters?.voucherId || undefined,
     studentId: filters?.studentId || undefined,
@@ -301,8 +284,13 @@ export function usePaymentDetail({ id, enabled = true }) {
 export function useRecordPayment({ onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/fee/payment', payload);
+    // `idempotencyKey` (one per opened payment form) travels as a header, not in the body
+    mutationFn: async ({ idempotencyKey, ...payload }) => {
+      const { data } = await apiClient.post(
+        '/fee/payment',
+        payload,
+        idempotencyHeaders(idempotencyKey),
+      );
       return data;
     },
     onSuccess: (res) => {
@@ -363,8 +351,12 @@ export function useConsolidatedView({ studentId, enabled = true }) {
 export function useRecordConsolidatedPayment({ onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/fee/payment/consolidated', payload);
+    mutationFn: async ({ idempotencyKey, ...payload }) => {
+      const { data } = await apiClient.post(
+        '/fee/payment/consolidated',
+        payload,
+        idempotencyHeaders(idempotencyKey),
+      );
       return data;
     },
     onSuccess: (res, vars) => {
@@ -402,6 +394,8 @@ export function useOutstandingReport({
   branchId,
   classId,
   sectionId,
+  page = 1,
+  limit = 100,
   enabled = true,
 }) {
   return useQuery({
@@ -410,16 +404,21 @@ export function useOutstandingReport({
       branchId || '',
       classId || '',
       sectionId || '',
+      page,
+      limit,
     ],
     queryFn: () =>
       fetchData({
         url: '/fee/report/outstanding',
+        page,
+        limit,
         branchId: branchId || undefined,
         classId: classId || undefined,
         sectionId: sectionId || undefined,
       }),
     enabled,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -432,6 +431,8 @@ export function useDefaultersReport({
   to,
   minOutstanding,
   includeDetails,
+  page = 1,
+  limit = 100,
   enabled = true,
 }) {
   const branchParam = Array.isArray(branchIds)
@@ -447,10 +448,14 @@ export function useDefaultersReport({
       to || '',
       minOutstanding || '',
       includeDetails ? '1' : '0',
+      page,
+      limit,
     ],
     queryFn: () =>
       fetchData({
         url: '/fee/report/defaulters',
+        page,
+        limit,
         branchIds: branchParam,
         classId: classId || undefined,
         sectionId: sectionId || undefined,
@@ -461,6 +466,7 @@ export function useDefaultersReport({
       }),
     enabled: enabled && !!from && !!to,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
