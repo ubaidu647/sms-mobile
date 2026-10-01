@@ -199,6 +199,7 @@ export default function PayslipDetailPage() {
   const status = payslip.status;
   const isDraft = status === 'draft';
   const isFinalized = status === 'finalized';
+  const isPartiallyPaid = status === 'partially-paid';
   const isPaid = status === 'paid';
   const isCancelled = status === 'cancelled';
   const cur = payslip.currency || 'PKR';
@@ -379,9 +380,36 @@ export default function PayslipDetailPage() {
                   via {PAYMENT_METHOD_LABELS[payslip.paymentMethod] || payslip.paymentMethod}
                 </Text>
               )}
+              {payslip.balanceAmount > 0 && (
+                <Text style={[styles.netVia, { color: '#b45309', fontWeight: '700' }]}>
+                  Remaining {formatMoney(payslip.balanceAmount, cur)}
+                </Text>
+              )}
             </View>
           )}
         </View>
+
+        {payslip.payments?.length > 1 && (
+          <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
+            <Text style={[styles.fieldLabel, { color: C.muted }]}>
+              PAYMENTS ({payslip.payments.length})
+            </Text>
+            {payslip.payments.map((p, i) => (
+              <View
+                key={p._id || i}
+                style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}
+              >
+                <Text style={{ color: C.muted }}>
+                  #{i + 1} • {formatDate(p.paymentDate)} •{' '}
+                  {PAYMENT_METHOD_LABELS[p.paymentMethod] || p.paymentMethod || '—'}
+                </Text>
+                <Text style={{ color: C.text, fontWeight: '700' }}>
+                  {formatMoney(p.amount, cur)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {editing && (
           <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -487,7 +515,7 @@ export default function PayslipDetailPage() {
         {/* Action buttons */}
         {!editing && !isCancelled && (
           <View style={styles.actionsRow}>
-            {canCancel && !isPaid && (
+            {canCancel && !isPaid && !isPartiallyPaid && (
               <Pressable
                 onPress={() => setShowCancel(true)}
                 style={({ pressed }) => [
@@ -529,7 +557,7 @@ export default function PayslipDetailPage() {
                 )}
               </Pressable>
             )}
-            {canPay && (isDraft || isFinalized) && (
+            {canPay && (isDraft || isFinalized || isPartiallyPaid) && (
               <Pressable
                 onPress={() => setShowPay(true)}
                 style={({ pressed }) => [
@@ -539,7 +567,9 @@ export default function PayslipDetailPage() {
                 ]}
               >
                 <Feather name="dollar-sign" size={14} color="#fff" />
-                <Text style={styles.actionBtnText}>Mark Paid</Text>
+                <Text style={styles.actionBtnText}>
+                  {isPartiallyPaid ? 'Pay Instalment' : 'Record Payment'}
+                </Text>
               </Pressable>
             )}
           </View>
@@ -568,9 +598,9 @@ function PayForm({ payslip, onClose, C }) {
   const [paymentDate, setPaymentDate] = useState(todayISO());
   const [paymentMethod, setPaymentMethod] = useState('bank-transfer');
   const [paymentReference, setPaymentReference] = useState('');
-  const [paidAmount, setPaidAmount] = useState(
-    payslip.netSalary != null ? String(payslip.netSalary) : '',
-  );
+  // Defaults to what is still owed; enter less to pay an instalment.
+  const remaining = payslip.balanceAmount ?? payslip.netSalary ?? 0;
+  const [paidAmount, setPaidAmount] = useState(String(remaining));
   const [notes, setNotes] = useState('');
 
   const pay = usePayPayslip({ id: payslip._id, onSuccess: () => onClose() });
@@ -590,15 +620,24 @@ function PayForm({ payslip, onClose, C }) {
     }
     const payload = { paymentDate, paymentMethod };
     if (paymentReference.trim()) payload.paymentReference = paymentReference.trim();
-    if (paidAmount !== '' && !Number.isNaN(Number(paidAmount)))
-      payload.paidAmount = Number(paidAmount);
+    // A fully deducted payslip (nothing owed) is settled without an amount.
+    if (remaining > 0 && paidAmount !== '' && !Number.isNaN(Number(paidAmount))) {
+      const amount = Number(paidAmount);
+      if (amount <= 0 || amount > remaining) {
+        Toast.show({ type: 'error', text1: `Amount must be between 1 and ${remaining}` });
+        return;
+      }
+      payload.paidAmount = amount;
+    }
     if (notes.trim()) payload.notes = notes.trim();
     pay.mutate(payload);
   };
 
   return (
     <View style={[styles.formCard, { borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }]}>
-      <Text style={[styles.formTitle, { color: '#0f766e' }]}>Mark as Paid</Text>
+      <Text style={[styles.formTitle, { color: '#0f766e' }]}>
+        Record Payment — remaining {remaining}
+      </Text>
 
       <View style={styles.row2}>
         <View style={{ flex: 1 }}>
@@ -622,7 +661,7 @@ function PayForm({ payslip, onClose, C }) {
             value={paidAmount}
             onChangeText={(v) => setPaidAmount(v.replace(/[^0-9.]/g, ''))}
             keyboardType="decimal-pad"
-            placeholder="netSalary"
+            placeholder={String(remaining)}
             placeholderTextColor={C.mutedSoft}
             style={[
               styles.input,
@@ -720,7 +759,7 @@ function PayForm({ payslip, onClose, C }) {
           ) : (
             <>
               <Feather name="check" size={14} color="#fff" />
-              <Text style={styles.actionBtnText}>Confirm Paid</Text>
+              <Text style={styles.actionBtnText}>Confirm Payment</Text>
             </>
           )}
         </Pressable>

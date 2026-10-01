@@ -5,15 +5,21 @@ import apiClient from '../services/apiClient';
 import { useTokenStore } from '../store/tokenStore';
 import { useUserStore } from '../store/userStore';
 import { BACKEND_URL } from '../config/env';
+import { queryClient } from '../services/queryClient';
+import { clearSession } from '../services/session';
+
+let logoutInFlight = false;
 
 export const useAuth = () => {
   const { accessToken, refreshToken, hasHydrated, setTokens, clearTokens } = useTokenStore();
   const { user, setUser, clearUser } = useUserStore();
   const [loading, setLoading] = useState(true);
   const hasFetchedUser = useRef(false);
-  const isLoggingOut = useRef(false);
 
   const login = (data) => {
+    logoutInFlight = false;
+    // Drop anything cached from a previous account before the new one loads.
+    queryClient.clear();
     const u = data.userCreated || data.user;
     if (u && u.id && !u._id) u._id = u.id;
     setUser(u);
@@ -50,8 +56,10 @@ export const useAuth = () => {
   }, [hasHydrated, accessToken, refreshToken, clearTokens, clearUser, setUser]);
 
   const logout = () => {
-    if (isLoggingOut.current) return;
-    isLoggingOut.current = true;
+    // Module-level guard: several components each hold their own useAuth()
+    // instance, so a per-instance ref could still fire two POST /auth/logout.
+    if (logoutInFlight) return;
+    logoutInFlight = true;
 
     const { accessToken: at, refreshToken: rt } = useTokenStore.getState();
 
@@ -65,8 +73,9 @@ export const useAuth = () => {
         .catch(() => {});
     }
 
-    clearUser();
-    clearTokens();
+    // Tokens, persisted user AND the React Query cache — the next account
+    // signing in on this device must never see this one's data.
+    clearSession();
     hasFetchedUser.current = false;
     router.replace('/(auth)/signin');
   };

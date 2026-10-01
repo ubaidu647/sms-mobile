@@ -13,11 +13,12 @@ import { useAnnouncementReadStats } from '../../hooks/useAnnouncements';
 import { formatDateTime, titleCase } from '../../constants/announcement';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import QueryErrorState from '../QueryErrorState';
 
 export default function ReadStatsModal({ open, announcement, onClose }) {
   const C = useColors();
   const id = announcement?._id;
-  const { data: stats, isLoading } = useAnnouncementReadStats({
+  const { data: stats, isLoading, isError, error } = useAnnouncementReadStats({
     id,
     enabled: open && !!id,
   });
@@ -55,7 +56,9 @@ export default function ReadStatsModal({ open, announcement, onClose }) {
           </Pressable>
         </View>
 
-        {isLoading || !stats ? (
+        {isError ? (
+          <QueryErrorState error={error} fallback="Could not load read stats" />
+        ) : isLoading || !stats ? (
           <View style={styles.center}>
             <ActivityIndicator color={COLORS.brand} />
           </View>

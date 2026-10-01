@@ -242,6 +242,10 @@ export function useUpdateRoute({ id, onSuccess } = {}) {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['routes'] });
       queryClient.invalidateQueries({ queryKey: ['route-detail', id] });
+      // A vehicle swap moves the route's riders, so rosters/assignments change too.
+      queryClient.invalidateQueries({ queryKey: ['transport-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicle-roster'] });
+      queryClient.invalidateQueries({ queryKey: ['route-roster'] });
       Toast.show({ type: 'success', text1: res?.message || 'Route updated' });
       onSuccess?.(res?.data);
     },

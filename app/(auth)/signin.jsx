@@ -19,6 +19,8 @@ import { useSignIn } from '../../src/hooks/useSignIn';
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
+  // Platform (super-admin) accounts sign in through a separate endpoint.
+  const [platform, setPlatform] = useState(false);
 
   const {
     control,
@@ -31,7 +33,7 @@ export default function SignIn() {
 
   const { mutate, isPending } = useSignIn();
 
-  const onSubmit = (data) => mutate(data);
+  const onSubmit = (data) => mutate({ ...data, platform });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -53,9 +55,13 @@ export default function SignIn() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.heading}>Sign in</Text>
+            <Text style={styles.heading}>
+              {platform ? 'Platform admin sign in' : 'Sign in'}
+            </Text>
             <Text style={styles.subheading}>
-              Welcome back. Enter your credentials to continue.
+              {platform
+                ? 'Sign in to the platform console with your super-admin account.'
+                : 'Welcome back. Enter your credentials to continue.'}
             </Text>
 
             <View style={styles.field}>
@@ -136,6 +142,18 @@ export default function SignIn() {
                 <Text style={styles.submitText}>Sign in</Text>
               )}
             </Pressable>
+
+            <Pressable
+              onPress={() => setPlatform((v) => !v)}
+              disabled={isPending}
+              style={styles.modeToggle}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={styles.modeToggleText}>
+                {platform ? 'School staff? Sign in here' : 'Platform admin? Sign in here'}
+              </Text>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -187,4 +205,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modeToggle: { alignSelf: 'center', marginTop: 14, padding: 6 },
+  modeToggleText: { color: '#0f766e', fontWeight: '600', fontSize: 13 },
 });

@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouteDetail, useVehicleDetail } from '../../hooks/useTransport';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import QueryErrorState from '../QueryErrorState';
 import { formatMoney } from '../../constants/fee';
 
 const PIN_COLORS = [
@@ -27,7 +28,7 @@ const PIN_COLORS = [
 
 export default function RouteDetailModal({ open, routeId, onClose }) {
   const C = useColors();
-  const { data: route, isLoading } = useRouteDetail({ id: routeId, enabled: open && !!routeId });
+  const { data: route, isLoading, isError, error } = useRouteDetail({ id: routeId, enabled: open && !!routeId });
 
   const populated = route?.vehicleId && typeof route.vehicleId === 'object' ? route.vehicleId : null;
   const vId = populated?._id || (typeof route?.vehicleId === 'string' ? route.vehicleId : '');
@@ -67,7 +68,9 @@ export default function RouteDetailModal({ open, routeId, onClose }) {
           </Pressable>
         </View>
 
-        {isLoading || !route ? (
+        {isError ? (
+          <QueryErrorState error={error} fallback="Could not load this route" />
+        ) : isLoading || !route ? (
           <View style={styles.center}>
             <ActivityIndicator color={COLORS.brand} />
           </View>

@@ -32,6 +32,33 @@ export const evaluateSubscription = (sub, nowMs = Date.now()) => {
   return { state: 'active', hardBlockAt, endDate };
 };
 
+// Normalises the server-computed GET /subscription/me/status payload into the
+// guard's shape. The server already evaluated the state; we only re-derive the
+// active→grace→expired transitions from its dates so a long-open session crosses
+// over without waiting for the next poll. Anything unrecognised → null (unknown,
+// fail-open).
+const KNOWN_STATES = ['active', 'grace', 'expired', 'cancelled', 'none'];
+
+const toDate = (v) => {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+export const fromStatusResponse = (status, nowMs = Date.now()) => {
+  if (!status || !KNOWN_STATES.includes(status.state)) {
+    return { state: null, endDate: null, hardBlockAt: null, packageName: null };
+  }
+  const endDate = toDate(status.endDate);
+  const hardBlockAt = toDate(status.hardBlockAt) || toDate(status.graceEndsAt);
+  let { state } = status;
+  if (state === 'active' || state === 'grace') {
+    if (hardBlockAt && nowMs > hardBlockAt.getTime()) state = 'expired';
+    else if (state === 'active' && endDate && nowMs > endDate.getTime()) state = 'grace';
+  }
+  return { state, endDate, hardBlockAt, packageName: status.packageName ?? null };
+};
+
 // States where the whole app should be hard-blocked.
 export const isBlockedState = (state) =>
   state === 'expired' || state === 'cancelled' || state === 'none';

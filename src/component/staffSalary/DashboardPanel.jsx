@@ -90,6 +90,7 @@ export default function DashboardPanel() {
   const counts = {
     draft: summary?.draft || 0,
     finalized: summary?.finalized || 0,
+    'partially-paid': summary?.['partially-paid'] || 0,
     paid: summary?.paid || 0,
     cancelled: summary?.cancelled || 0,
   };
@@ -191,6 +192,11 @@ export default function DashboardPanel() {
             <View style={styles.statusGrid}>
               <StatusTile status="draft" count={counts.draft} icon="clock" />
               <StatusTile status="finalized" count={counts.finalized} icon="file-text" />
+              <StatusTile
+                status="partially-paid"
+                count={counts['partially-paid']}
+                icon="dollar-sign"
+              />
               <StatusTile status="paid" count={counts.paid} icon="check-circle" />
               <StatusTile status="cancelled" count={counts.cancelled} icon="x-circle" />
             </View>

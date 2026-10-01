@@ -35,7 +35,8 @@
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to pick photos for staff profiles and announcement attachments."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

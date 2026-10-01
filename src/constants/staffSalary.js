@@ -1,11 +1,17 @@
 // Mirror of sms-frontend/src/constants/staffSalary.js. Keep in sync.
 export const COMPONENT_TYPES = ['fixed', 'percent'];
 
-export const PAYSLIP_STATUSES = ['draft', 'finalized', 'paid', 'cancelled'];
+export const PAYSLIP_STATUSES = ['draft', 'finalized', 'partially-paid', 'paid', 'cancelled'];
 
 export const PAYSLIP_STATUS_PILL = {
   draft: { bg: '#f3f4f6', fg: '#374151', solid: '#6b7280', label: 'Draft' },
   finalized: { bg: '#dbeafe', fg: '#1e40af', solid: '#2563eb', label: 'Finalized' },
+  'partially-paid': {
+    bg: '#fef3c7',
+    fg: '#92400e',
+    solid: '#d97706',
+    label: 'Partially Paid',
+  },
   paid: { bg: '#dcfce7', fg: '#166534', solid: '#16a34a', label: 'Paid' },
   cancelled: { bg: '#fee2e2', fg: '#991b1b', solid: '#dc2626', label: 'Cancelled' },
 };

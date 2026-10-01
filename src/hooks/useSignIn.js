@@ -8,8 +8,11 @@ import { isSuperAdmin } from '../utils/permissions';
 export function useSignIn() {
   const { login } = useAuth();
   return useMutation({
-    mutationFn: async (data) => {
-      const res = await apiClient.post('/auth/login', data);
+    // `platform: true` signs a platform super-admin in through the system
+    // portal — /auth/login rejects super-admins by design.
+    mutationFn: async ({ platform = false, ...credentials }) => {
+      const url = platform ? '/auth/system/login' : '/auth/login';
+      const res = await apiClient.post(url, credentials);
       return res.data;
     },
     onSuccess: (response) => {

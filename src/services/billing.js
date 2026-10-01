@@ -21,6 +21,22 @@ export const getMyCurrentSubscription = async () => {
   }
 };
 
+// Lightweight subscription STATE for the logged-in school — readable by ANY
+// signed-in tenant user (no 'view-billing' needed), so the global guard works
+// for every staff role. Returns { state, hardBlockAt, endDate, graceEndsAt?,
+// packageName }. Errors keep the HTTP status on `error.status` so the guard can
+// skip retries for 4xx.
+export const getMySubscriptionStatus = async () => {
+  try {
+    const res = await apiClient.get('/subscription/me/status');
+    return unwrap(res);
+  } catch (error) {
+    const err = new Error(error.response?.data?.message || error.message || 'Request failed');
+    err.status = error.response?.status;
+    throw err;
+  }
+};
+
 // Full subscription history for the logged-in school, newest-first.
 export const getMySubscriptionHistory = async () => {
   try {

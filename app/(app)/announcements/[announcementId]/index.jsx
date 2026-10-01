@@ -35,6 +35,7 @@ import {
 import EditAnnouncementModal from '../../../../src/component/announcement/EditAnnouncementModal';
 import ManageAttachmentsModal from '../../../../src/component/announcement/ManageAttachmentsModal';
 import ReadStatsModal from '../../../../src/component/announcement/ReadStatsModal';
+import QueryErrorState from '../../../../src/component/QueryErrorState';
 
 function Pill({ bg, fg, icon, label }) {
   if (!label) return null;
@@ -70,7 +71,7 @@ export default function AnnouncementDetailScreen() {
     actions.includes('view-announcement') ||
     actions.includes('view-all-branch-announcement');
 
-  const { data: a, isLoading, refetch } = useAnnouncementDetail({ id: announcementId });
+  const { data: a, isLoading, isError, error, refetch } = useAnnouncementDetail({ id: announcementId });
 
   const markRead = useMarkAnnouncementRead();
   const acknowledge = useAcknowledgeAnnouncement();
@@ -87,6 +88,15 @@ export default function AnnouncementDetailScreen() {
   const [editOpen, setEditOpen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+
+  if (isError) {
+    return (
+      <View style={[styles.root, { backgroundColor: C.bg }]}>
+        <Header onBack={() => router.back()} C={C} title="Announcement" />
+        <QueryErrorState error={error} fallback="Could not load this announcement" />
+      </View>
+    );
+  }
 
   if (isLoading || !a) {
     return (
