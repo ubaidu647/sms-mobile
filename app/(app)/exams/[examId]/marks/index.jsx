@@ -22,7 +22,7 @@ import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 import { hasAnyAction } from '../../../../../src/utils/permissions';
-import { buildMarkEntries, toMark } from '../../../../../src/utils/marksEntries';
+import { buildMarkEntries, savedStudentIds, toMark } from '../../../../../src/utils/marksEntries';
 import {
   EXAM_STATUS_PILL,
   GRADE_PILL,
@@ -163,7 +163,11 @@ export default function MarksEntryPage() {
       Toast.show({ type: 'error', text1: 'No students in this section' });
       return;
     }
-    const entries = buildMarkEntries(students, marks, { hasTheory, hasPractical });
+    const entries = buildMarkEntries(students, marks, {
+      hasTheory,
+      hasPractical,
+      saved: savedStudentIds(existingResults),
+    });
     if (!entries.length) {
       Toast.show({ type: 'error', text1: 'Enter at least one mark (or mark a student absent)' });
       return;

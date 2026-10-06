@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMarkEntries } from './marksEntries.js';
+import { buildMarkEntries, savedStudentIds } from './marksEntries.js';
 
 const students = [{ _id: 'a' }, { _id: 'b' }, { _id: 'c' }];
 
@@ -34,4 +34,23 @@ test('a typed 0 is still a 0, and absent needs no mark', () => {
     { studentId: 'a', theoryObtained: 0 },
     { studentId: 'b', isAbsent: true },
   ]);
+});
+
+test('wiping a saved mark clears it; a never-saved blank row is still left out', () => {
+  const entries = buildMarkEntries(
+    students,
+    { a: { theoryObtained: '' }, b: { theoryObtained: '' }, c: { theoryObtained: '12' } },
+    { hasTheory: true, hasPractical: false, saved: new Set(['a', 'c']) },
+  );
+  assert.deepEqual(entries, [
+    { studentId: 'a', clear: true },
+    { studentId: 'c', theoryObtained: 12 },
+  ]);
+});
+
+test('savedStudentIds reads populated and plain student ids', () => {
+  assert.deepEqual(
+    [...savedStudentIds([{ studentId: { _id: 'a' } }, { studentId: 'b' }])],
+    ['a', 'b'],
+  );
 });

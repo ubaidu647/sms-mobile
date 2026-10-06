@@ -226,11 +226,11 @@ export function useEnterMarks({ examId, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['exam-detail', examId] });
       queryClient.invalidateQueries({ queryKey: ['section-summary', examId] });
       queryClient.invalidateQueries({ queryKey: ['result-card', examId] });
-      const { created = 0, updated = 0 } = res?.data || {};
+      const { created = 0, updated = 0, cleared = 0 } = res?.data || {};
       Toast.show({
         type: 'success',
         text1: 'Marks saved',
-        text2: `${created} created · ${updated} updated`,
+        text2: `${created} created · ${updated} updated${cleared ? ` · ${cleared} cleared` : ''}`,
       });
       onSuccess?.(res?.data);
     },
