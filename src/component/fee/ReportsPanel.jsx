@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -217,17 +217,20 @@ function OutstandingReport({ C }) {
   const { data: branchData } = useBranchesDropdown({ enabled: isOrgLevel });
   const branches = branchData?.data || [];
   const effectiveBranchId = isOrgLevel ? branchId : userBranchId;
+  // The class/section pickers read /class/* (view-class). Without it they're
+  // hidden and never queried, and the report still works unfiltered.
+  const canPickClass = hasAnyAction(user?.role, ['view-class', 'view-all-branch-class']);
 
   const { data: classData } = useClassesForFee({
     branchId: effectiveBranchId || undefined,
     academicYear,
-    enabled: !!academicYear,
+    enabled: canPickClass && !!academicYear,
   });
-  const classes = classData?.data || [];
+  const classes = canPickClass ? classData?.data || [] : [];
 
   const { data: sectionData } = useSectionsForFee({
     classId,
-    enabled: !!classId,
+    enabled: canPickClass && !!classId,
   });
   const sections = sectionData?.data || [];
 
@@ -241,6 +244,13 @@ function OutstandingReport({ C }) {
   // { grandTotal, studentCount, page, limit, truncated, students: [flat rows] }
   const report = data?.data;
   const rows = report?.students || [];
+
+  // A page past the end (e.g. the last rows were just paid off) steps back.
+  useEffect(() => {
+    if (!isFetching && report && rows.length === 0 && page > 1) {
+      setPage((p) => Math.max(1, p - 1));
+    }
+  }, [isFetching, report, rows.length, page]);
 
   return (
     <View style={{ gap: 12 }}>
@@ -416,10 +426,24 @@ function OutstandingReport({ C }) {
           <ActivityIndicator size="large" color={COLORS.brand} />
         </View>
       ) : rows.length === 0 ? (
-        <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Feather name="check-circle" size={28} color="#16a34a" />
-          <Text style={[styles.emptyText, { color: C.muted }]}>No outstanding vouchers.</Text>
-        </View>
+        <>
+          {page > 1 && (
+            <ReportPager
+              page={page}
+              limit={report?.limit || REPORT_PAGE_SIZE}
+              shown={0}
+              total={report?.studentCount}
+              truncated={false}
+              onPage={setPage}
+              noun="students"
+              C={C}
+            />
+          )}
+          <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
+            <Feather name="check-circle" size={28} color="#16a34a" />
+            <Text style={[styles.emptyText, { color: C.muted }]}>No outstanding vouchers.</Text>
+          </View>
+        </>
       ) : (
         <>
           <View style={[styles.kpi, { backgroundColor: '#991b1b10', borderColor: '#991b1b40' }]}>
@@ -512,6 +536,13 @@ function DefaultersReport({ C }) {
   const report = data?.data;
   const rows = report?.rows || [];
 
+  // A page past the end steps back rather than stranding the user.
+  useEffect(() => {
+    if (!isFetching && report && rows.length === 0 && page > 1) {
+      setPage((p) => Math.max(1, p - 1));
+    }
+  }, [isFetching, report, rows.length, page]);
+
   if (!canView) {
     return (
       <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border, margin: 14 }]}>
@@ -585,10 +616,24 @@ function DefaultersReport({ C }) {
           <ActivityIndicator size="large" color={COLORS.brand} />
         </View>
       ) : rows.length === 0 ? (
-        <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Feather name="check-circle" size={28} color="#16a34a" />
-          <Text style={[styles.emptyText, { color: C.muted }]}>No defaulters in this range.</Text>
-        </View>
+        <>
+          {page > 1 && (
+            <ReportPager
+              page={page}
+              limit={report?.limit || REPORT_PAGE_SIZE}
+              shown={0}
+              total={report?.totals?.studentCount}
+              truncated={false}
+              onPage={setPage}
+              noun="students"
+              C={C}
+            />
+          )}
+          <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
+            <Feather name="check-circle" size={28} color="#16a34a" />
+            <Text style={[styles.emptyText, { color: C.muted }]}>No defaulters in this range.</Text>
+          </View>
+        </>
       ) : (
         <>
           <ReportPager
@@ -641,15 +686,49 @@ function DefaultersReport({ C }) {
   );
 }
 
+// Each tab is gated by the action its API route requires, so a tab the user
+// can't open is never shown (and never fires a forbidden query).
+const REPORT_TABS = [
+  {
+    key: 'collection',
+    label: 'Collection',
+    icon: 'trending-up',
+    actions: ['view-payment', 'view-all-branch-payment'],
+  },
+  {
+    key: 'outstanding',
+    label: 'Outstanding',
+    icon: 'trending-down',
+    actions: ['view-fee', 'view-all-branch-fee'],
+  },
+  {
+    key: 'defaulters',
+    label: 'Defaulters',
+    icon: 'user-x',
+    actions: ['student-defaults-list-view', 'student-defaults-list-view-all-branch'],
+  },
+];
+
 export default function ReportsPanel() {
   const C = useColors();
-  const [tab, setTab] = useState('collection');
+  const { user } = useUserStore();
+  const TABS = REPORT_TABS.filter((t) => hasAnyAction(user?.role, t.actions));
+  const [picked, setPicked] = useState(null);
+  // Default to the first permitted tab; fall back to it if the picked one is
+  // no longer allowed (e.g. role refreshed).
+  const tab = TABS.some((t) => t.key === picked) ? picked : TABS[0]?.key;
+  const setTab = setPicked;
 
-  const TABS = [
-    { key: 'collection', label: 'Collection', icon: 'trending-up' },
-    { key: 'outstanding', label: 'Outstanding', icon: 'trending-down' },
-    { key: 'defaulters', label: 'Defaulters', icon: 'user-x' },
-  ];
+  if (TABS.length === 0) {
+    return (
+      <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border, margin: 14 }]}>
+        <Feather name="lock" size={28} color={COLORS.red} />
+        <Text style={[styles.emptyText, { color: C.muted }]}>
+          You don't have permission to view any fee reports.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView

@@ -6,7 +6,7 @@ import { useTokenStore } from '../store/tokenStore';
 import { useUserStore } from '../store/userStore';
 import { BACKEND_URL } from '../config/env';
 import { queryClient } from '../services/queryClient';
-import { clearSession } from '../services/session';
+import { bumpSessionGeneration, clearSession } from '../services/session';
 
 let logoutInFlight = false;
 
@@ -18,6 +18,9 @@ export const useAuth = () => {
 
   const login = (data) => {
     logoutInFlight = false;
+    // A refresh still in flight from a previous session must not overwrite
+    // the tokens this login is about to store.
+    bumpSessionGeneration();
     // Drop anything cached from a previous account before the new one loads.
     queryClient.clear();
     const u = data.userCreated || data.user;

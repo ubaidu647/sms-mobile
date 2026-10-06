@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,8 +22,9 @@ import {
   ANNOUNCEMENT_TYPES,
   PRIORITY_PILL,
   TYPE_ICONS,
+  localInputToISO,
   titleCase,
-  toYMD,
+  toLocalDateTimeInput,
 } from '../../constants/announcement';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
@@ -34,12 +35,16 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
   const { user } = useUserStore();
   const isAdmin = !!user?.role?.isPredefined;
   const isOrgLevel = isAdmin || !!user?.role?.actions?.includes('update-all-branch-announcement');
-  // Moving to published/archived needs publish-announcement; without it only
-  // draft (or leaving the current status untouched) is offered.
+  // Any move into or out of published/archived needs publish-announcement.
+  // Without it a draft can only stay a draft, and a published/archived notice
+  // can only keep its current status (un-publishing to draft is a publish
+  // decision too, so it isn't offered).
   const canPublish = isAdmin || !!user?.role?.actions?.includes('publish-announcement');
-  const statusOptions = canPublish
-    ? ANNOUNCEMENT_STATUSES
-    : ANNOUNCEMENT_STATUSES.filter((s) => s === 'draft' || s === announcement?.status);
+  const currentStatus = announcement?.status || 'draft';
+  const statusOptions = canPublish ? ANNOUNCEMENT_STATUSES : [currentStatus];
+  // On a live notice, pinning / ack / taking it down are publish decisions.
+  const lockPublishFields =
+    !canPublish && (currentStatus === 'published' || currentStatus === 'archived');
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -52,21 +57,37 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
   const [requiresAck, setRequiresAck] = useState(false);
   const [status, setStatus] = useState('draft');
   const [isActive, setIsActive] = useState(true);
+  // What the form was seeded with — only fields that differ are sent, so an
+  // untouched date is never re-sent (and re-interpreted) on save.
+  const initialRef = useRef({});
 
+  // Seed on the open transition (or when a different notice is opened), not on
+  // every refetch of the same notice, so in-progress edits survive.
   useEffect(() => {
     if (!open || !announcement) return;
+    const init = {
+      priority: announcement.priority || 'normal',
+      publishedAt: toLocalDateTimeInput(announcement.publishedAt),
+      expiresAt: toLocalDateTimeInput(announcement.expiresAt),
+      isPinned: !!announcement.isPinned,
+      requiresAck: !!announcement.requiresAck,
+      status: announcement.status || 'draft',
+      isActive: announcement.isActive !== false,
+    };
+    initialRef.current = init;
     setTitle(announcement.title || '');
     setBody(announcement.body || '');
     setType(announcement.type || 'general');
-    setPriority(announcement.priority || 'normal');
+    setPriority(init.priority);
     setAudience(announcement.audience || null);
-    setPublishedAt(toYMD(announcement.publishedAt));
-    setExpiresAt(toYMD(announcement.expiresAt));
-    setIsPinned(!!announcement.isPinned);
-    setRequiresAck(!!announcement.requiresAck);
-    setStatus(announcement.status || 'draft');
-    setIsActive(announcement.isActive !== false);
-  }, [open, announcement]);
+    setPublishedAt(init.publishedAt);
+    setExpiresAt(init.expiresAt);
+    setIsPinned(init.isPinned);
+    setRequiresAck(init.requiresAck);
+    setStatus(init.status);
+    setIsActive(init.isActive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, announcement?._id]);
 
   const update = useUpdateAnnouncement({
     id: announcement?._id,
@@ -82,19 +103,49 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
       Toast.show({ type: 'error', text1: 'Body is required' });
       return;
     }
-    const payload = {
-      title: title.trim(),
-      body,
-      type,
-      priority,
-      isPinned,
-      requiresAck,
-      status,
-      isActive,
-    };
+    const init = initialRef.current;
+    const payload = { title: title.trim(), body, type };
+    if (priority !== init.priority) payload.priority = priority;
+    if (isPinned !== init.isPinned) payload.isPinned = isPinned;
+    if (requiresAck !== init.requiresAck) payload.requiresAck = requiresAck;
+    if (isActive !== init.isActive) payload.isActive = isActive;
+    if (status !== init.status) payload.status = status;
     if (audience) payload.audience = audience;
-    if (publishedAt) payload.publishedAt = publishedAt;
-    if (expiresAt) payload.expiresAt = expiresAt;
+
+    // Dates: only when edited. A cleared field sends null (removes the date);
+    // anything else goes as a full ISO instant built from local time.
+    let pubISO;
+    if (publishedAt.trim() !== init.publishedAt) {
+      pubISO = localInputToISO(publishedAt);
+      if (pubISO === undefined) {
+        Toast.show({
+          type: 'error',
+          text1: 'Invalid publish date',
+          text2: 'Use YYYY-MM-DD or YYYY-MM-DD HH:mm',
+        });
+        return;
+      }
+      payload.publishedAt = pubISO;
+    }
+    let expISO;
+    if (expiresAt.trim() !== init.expiresAt) {
+      expISO = localInputToISO(expiresAt);
+      if (expISO === undefined) {
+        Toast.show({
+          type: 'error',
+          text1: 'Invalid expiry date',
+          text2: 'Use YYYY-MM-DD or YYYY-MM-DD HH:mm',
+        });
+        return;
+      }
+      payload.expiresAt = expISO;
+    }
+    const effPub = pubISO !== undefined ? pubISO : localInputToISO(publishedAt);
+    const effExp = expISO !== undefined ? expISO : localInputToISO(expiresAt);
+    if (effPub && effExp && new Date(effExp) <= new Date(effPub)) {
+      Toast.show({ type: 'error', text1: 'Expires must be after publish date' });
+      return;
+    }
     update.mutate(payload);
   };
 
@@ -216,6 +267,7 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                     <Pressable
                       key={p}
                       onPress={() => setPriority(p)}
+                      disabled={lockPublishFields && !active}
                       style={({ pressed }) => [
                         styles.chip,
                         {
@@ -240,7 +292,8 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                 <TextInput
                   value={publishedAt}
                   onChangeText={setPublishedAt}
-                  placeholder="optional"
+                  editable={!lockPublishFields}
+                  placeholder="YYYY-MM-DD HH:mm"
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
@@ -255,7 +308,8 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
                 <TextInput
                   value={expiresAt}
                   onChangeText={setExpiresAt}
-                  placeholder="optional"
+                  editable={!lockPublishFields}
+                  placeholder="YYYY-MM-DD HH:mm"
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
@@ -270,13 +324,14 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
             <View style={styles.toggleRow}>
               <Pressable
                 onPress={() => setIsPinned((v) => !v)}
+                disabled={lockPublishFields}
                 style={({ pressed }) => [
                   styles.toggle,
                   {
                     backgroundColor: isPinned ? '#fef3c7' : C.bg,
                     borderColor: isPinned ? '#fde68a' : C.border,
                   },
-                  pressed && { opacity: 0.85 },
+                  (pressed || lockPublishFields) && { opacity: lockPublishFields ? 0.5 : 0.85 },
                 ]}
               >
                 <Feather
@@ -290,13 +345,14 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
               </Pressable>
               <Pressable
                 onPress={() => setRequiresAck((v) => !v)}
+                disabled={lockPublishFields}
                 style={({ pressed }) => [
                   styles.toggle,
                   {
                     backgroundColor: requiresAck ? '#dbeafe' : C.bg,
                     borderColor: requiresAck ? '#bfdbfe' : C.border,
                   },
-                  pressed && { opacity: 0.85 },
+                  (pressed || lockPublishFields) && { opacity: lockPublishFields ? 0.5 : 0.85 },
                 ]}
               >
                 <Feather
@@ -310,13 +366,14 @@ export default function EditAnnouncementModal({ open, announcement, onClose }) {
               </Pressable>
               <Pressable
                 onPress={() => setIsActive((v) => !v)}
+                disabled={lockPublishFields}
                 style={({ pressed }) => [
                   styles.toggle,
                   {
                     backgroundColor: isActive ? '#dcfce7' : C.bg,
                     borderColor: isActive ? '#86efac' : C.border,
                   },
-                  pressed && { opacity: 0.85 },
+                  (pressed || lockPublishFields) && { opacity: lockPublishFields ? 0.5 : 0.85 },
                 ]}
               >
                 <Feather

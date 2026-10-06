@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -22,12 +22,24 @@ import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 import { hasAnyAction } from '../../../../../src/utils/permissions';
+import { buildMarkEntries, toMark } from '../../../../../src/utils/marksEntries';
 import {
   EXAM_STATUS_PILL,
   GRADE_PILL,
   formatDate,
   gradeFromPercentage,
 } from '../../../../../src/constants/exam';
+
+// Stable fallbacks: a fresh `[]` default on every render would change the
+// effect deps below each render and re-seed (and wipe) the marks forever.
+const EMPTY = Object.freeze([]);
+
+const seedEntry = (r) => ({
+  theoryObtained: r?.theoryObtained != null ? String(r.theoryObtained) : '',
+  practicalObtained: r?.practicalObtained != null ? String(r.practicalObtained) : '',
+  isAbsent: r?.isAbsent ?? false,
+  remarks: r?.remarks ?? '',
+});
 
 export default function MarksEntryPage() {
   const router = useRouter();
@@ -57,43 +69,59 @@ export default function MarksEntryPage() {
   });
   const sections = sectionData?.data || [];
 
-  const { data: students = [], isLoading: studentsLoading } = useStudentsByList({
+  const { data: students, isLoading: studentsLoading } = useStudentsByList({
     sectionId,
   });
 
-  const { data: existingResults = [], isFetching: resultsLoading } = useExamResults({
+  const { data: resultsData, isFetching: resultsLoading } = useExamResults({
     examId,
     examSubjectId,
     sectionId,
   });
+  const existingResults = resultsData || EMPTY;
+
+  // Students the user has typed into for the current subject+section. Their
+  // entries are never overwritten by a refetch; only untouched rows are
+  // (re)seeded from the server. Switching subject/section starts fresh.
+  const editedRef = useRef(new Set());
+  const seededScopeRef = useRef(null);
+  const scopeKey = `${examId}|${examSubjectId}|${sectionId}`;
 
   useEffect(() => {
-    if (!students.length) {
-      setMarks({});
-      return;
+    const scopeChanged = seededScopeRef.current !== scopeKey;
+    if (scopeChanged) {
+      seededScopeRef.current = scopeKey;
+      editedRef.current = new Set();
     }
-    const initial = {};
-    students.forEach((s) => {
-      const r = existingResults.find((er) => {
-        const sid = typeof er.studentId === 'object' ? er.studentId?._id : er.studentId;
-        return sid === s._id;
-      });
-      initial[s._id] = {
-        theoryObtained: r?.theoryObtained != null ? String(r.theoryObtained) : '',
-        practicalObtained: r?.practicalObtained != null ? String(r.practicalObtained) : '',
-        isAbsent: r?.isAbsent ?? false,
-        remarks: r?.remarks ?? '',
-      };
+    const byStudent = new Map();
+    existingResults.forEach((er) => {
+      const sid = typeof er.studentId === 'object' ? er.studentId?._id : er.studentId;
+      if (sid) byStudent.set(sid, er);
     });
-    setMarks(initial);
-  }, [students, existingResults]);
+    setMarks((prev) => {
+      const base = scopeChanged ? {} : prev;
+      const next = {};
+      students.forEach((s) => {
+        next[s._id] =
+          editedRef.current.has(s._id) && base[s._id]
+            ? base[s._id]
+            : seedEntry(byStudent.get(s._id));
+      });
+      return next;
+    });
+  }, [scopeKey, students, existingResults]);
 
-  const updateMark = (studentId, patch) =>
+  const updateMark = (studentId, patch) => {
+    editedRef.current.add(studentId);
     setMarks((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }));
+  };
 
   const computedRow = (studentId) => {
     const m = marks[studentId] || {};
     if (m.isAbsent) return { total: 0, pct: 0, grade: '—', passed: false };
+    // Nothing typed yet: no grade, rather than a 0 / F preview.
+    if (toMark(m.theoryObtained) === null && toMark(m.practicalObtained) === null)
+      return { total: '—', pct: '—', grade: '—', passed: true };
     const t = Number(m.theoryObtained) || 0;
     const p = Number(m.practicalObtained) || 0;
     const total = t + p;
@@ -117,7 +145,14 @@ export default function MarksEntryPage() {
     return { absent, entered, total: students.length };
   }, [marks, students.length]);
 
-  const enter = useEnterMarks({ examId });
+  // Once saved, the server copy is authoritative again — let the post-save
+  // refetch re-seed every row.
+  const enter = useEnterMarks({
+    examId,
+    onSuccess: () => {
+      editedRef.current = new Set();
+    },
+  });
 
   const handleSave = () => {
     if (!examSubjectId || !sectionId) {
@@ -128,24 +163,11 @@ export default function MarksEntryPage() {
       Toast.show({ type: 'error', text1: 'No students in this section' });
       return;
     }
-    const entries = students.map((s) => {
-      const m = marks[s._id] || {};
-      const entry = { studentId: s._id };
-      if (m.isAbsent) {
-        entry.isAbsent = true;
-      } else if (hasTheory && hasPractical) {
-        entry.theoryObtained = Number(m.theoryObtained) || 0;
-        entry.practicalObtained = Number(m.practicalObtained) || 0;
-      } else if (hasTheory) {
-        entry.theoryObtained = Number(m.theoryObtained) || 0;
-      } else if (hasPractical) {
-        entry.practicalObtained = Number(m.practicalObtained) || 0;
-      } else {
-        entry.theoryObtained = Number(m.theoryObtained) || 0;
-      }
-      if (m.remarks) entry.remarks = m.remarks;
-      return entry;
-    });
+    const entries = buildMarkEntries(students, marks, { hasTheory, hasPractical });
+    if (!entries.length) {
+      Toast.show({ type: 'error', text1: 'Enter at least one mark (or mark a student absent)' });
+      return;
+    }
     enter.mutate({ examSubjectId, sectionId, entries });
   };
 
@@ -382,7 +404,7 @@ export default function MarksEntryPage() {
                       ) : (
                         <>
                           <Text style={[styles.totalText, { color: C.text }]}>{c.total}</Text>
-                          <Text style={[styles.pctText, { color: C.muted }]}>{c.pct}%</Text>
+                          <Text style={[styles.pctText, { color: C.muted }]}>{c.pct === '—' ? '—' : `${c.pct}%`}</Text>
                         </>
                       )}
                       {!m.isAbsent && grade && (
@@ -533,8 +555,10 @@ function Stat({ label, value, C }) {
 // Adapter to keep the call site short: unwrap data array from the api response.
 function useStudentsByList({ sectionId }) {
   const q = useStudentsBySection({ sectionId });
+  const list = q.data?.data;
+  const data = useMemo(() => (Array.isArray(list) ? list : EMPTY), [list]);
   return {
-    data: q.data?.data || [],
+    data,
     isLoading: q.isLoading,
     refetch: q.refetch,
   };

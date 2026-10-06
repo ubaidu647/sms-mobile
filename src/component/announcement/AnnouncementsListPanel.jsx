@@ -14,6 +14,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
+import { canActOnBranch } from '../../utils/permissions';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import { useBranchesDropdown } from '../../hooks/useBranchProfilesList';
@@ -61,14 +62,6 @@ export default function AnnouncementsListPanel() {
     isAdmin ||
     actions.includes('create-announcement') ||
     actions.includes('create-all-branch-announcement');
-  const canUpdate =
-    isAdmin ||
-    actions.includes('update-announcement') ||
-    actions.includes('update-all-branch-announcement');
-  const canDelete =
-    isAdmin ||
-    actions.includes('delete-announcement') ||
-    actions.includes('delete-all-branch-announcement');
   const canPublish = isAdmin || actions.includes('publish-announcement');
   const canViewStats =
     isAdmin ||
@@ -314,8 +307,7 @@ export default function AnnouncementsListPanel() {
       <ActionSheet
         target={actionTarget}
         onClose={() => setActionTarget(null)}
-        canUpdate={canUpdate}
-        canDelete={canDelete}
+        user={user}
         canPublish={canPublish}
         canViewStats={canViewStats}
         onView={(row) => {
@@ -543,9 +535,8 @@ function ChipGroup({ label, options, value, onChange, C }) {
 function ActionSheet({
   target,
   onClose,
-  canUpdate,
-  canDelete,
-  canPublish,
+  user,
+  canPublish: canPublishAction,
   canViewStats,
   onView,
   onStats,
@@ -560,6 +551,16 @@ function ActionSheet({
   C,
 }) {
   if (!target) return null;
+  // Branch reach (API rule): a branch-tier manager only manages notices of
+  // their own branch — never another branch's, nor a school-wide one (no
+  // branchId), which belongs to the org level.
+  const canUpdate = canActOnBranch(user, 'update-announcement', target.branchId);
+  // Publish/archive also run the update branch check server-side.
+  const canPublish = canPublishAction && canUpdate;
+  // Deleting a live notice withdraws it from readers — a publish decision.
+  const canDelete =
+    canActOnBranch(user, 'delete-announcement', target.branchId) &&
+    (target.status !== 'published' || canPublishAction);
   const items = [{ key: 'view', label: 'View', icon: 'eye', onPress: () => onView(target) }];
   if (canViewStats) items.push({ key: 'stats', label: 'Read Stats', icon: 'bar-chart-2', onPress: () => onStats(target) });
   if (canUpdate) {

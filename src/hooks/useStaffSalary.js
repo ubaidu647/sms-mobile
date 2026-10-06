@@ -40,7 +40,9 @@ export function useActiveStructure({ staffId, enabled = true }) {
     queryKey: ['staff-salary-active', staffId],
     queryFn: async () => {
       const { data } = await apiClient.get(`/staff-salary/structure/staff/${staffId}`);
-      return data;
+      // "No active salary structure" comes back as 200 { data: null }: return
+      // the structure itself, or null — never the envelope (which is truthy).
+      return data?.data ?? null;
     },
     enabled: enabled && !!staffId,
     staleTime: 30_000,

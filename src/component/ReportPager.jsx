@@ -16,10 +16,13 @@ export default function ReportPager({
   C,
   noun = 'rows',
 }) {
-  const from = shown > 0 ? (page - 1) * limit + 1 : 0;
-  const to = (page - 1) * limit + shown;
-  const totalCount = typeof total === 'number' ? total : to;
-  const pageCount = Math.max(1, Math.ceil(totalCount / Math.max(1, limit)));
+  const size = Math.max(1, limit);
+  const totalCount = typeof total === 'number' ? total : (page - 1) * size + shown;
+  // Range of this page clamped to the total: "0–0" when nothing matched or the
+  // page came back empty, never "1–0" or a range past the end.
+  const from = totalCount > 0 && shown > 0 ? Math.min((page - 1) * size + 1, totalCount) : 0;
+  const to = from > 0 ? Math.min(page * size, totalCount) : 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / size));
   const hasPrev = page > 1;
   const hasNext = !!truncated || page < pageCount;
   if (!hasPrev && !hasNext && !truncated) {

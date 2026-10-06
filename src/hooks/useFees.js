@@ -281,6 +281,13 @@ export function usePaymentDetail({ id, enabled = true }) {
   });
 }
 
+// Every fee report (collection / outstanding / defaulters / …) is derived from
+// payments, so any payment write must refresh all of them.
+const invalidateFeeReports = (queryClient) =>
+  queryClient.invalidateQueries({
+    predicate: (q) => typeof q.queryKey?.[0] === 'string' && q.queryKey[0].startsWith('fee-report-'),
+  });
+
 export function useRecordPayment({ onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -298,6 +305,7 @@ export function useRecordPayment({ onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['vouchers'] });
       queryClient.invalidateQueries({ queryKey: ['voucher'] });
       queryClient.invalidateQueries({ queryKey: ['fee-consolidated'] });
+      invalidateFeeReports(queryClient);
       const r = res?.data?.payment?.receiptNumber;
       Toast.show({
         type: 'success',
@@ -324,6 +332,9 @@ export function useVoidPayment({ id, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payment-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['vouchers'] });
+      queryClient.invalidateQueries({ queryKey: ['voucher'] });
+      queryClient.invalidateQueries({ queryKey: ['fee-consolidated'] });
+      invalidateFeeReports(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Payment voided' });
       onSuccess?.(res?.data);
     },
@@ -363,6 +374,8 @@ export function useRecordConsolidatedPayment({ onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['fee-consolidated', vars.studentId] });
       queryClient.invalidateQueries({ queryKey: ['vouchers'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['voucher'] });
+      invalidateFeeReports(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Payment recorded' });
       onSuccess?.(res?.data);
     },

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchData } from '../services/api';
 
 export function useBranches({ page, limit, search, status, from, to }) {
@@ -14,6 +14,6 @@ export function useBranches({ page, limit, search, status, from, to }) {
         from,
         to,
       }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 }

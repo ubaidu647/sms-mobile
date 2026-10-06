@@ -24,6 +24,7 @@ import {
   PRIORITY_PILL,
   TYPE_ICONS,
   formatBytes,
+  localInputToISO,
   titleCase,
   validateFile,
 } from '../../constants/announcement';
@@ -115,7 +116,11 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
       return 'Pick at least one section';
     if (audience.scope === 'staff' && !audience.staffIds?.length)
       return 'Pick at least one staff member';
-    if (publishedAt && expiresAt && new Date(expiresAt) <= new Date(publishedAt))
+    const pubISO = localInputToISO(publishedAt);
+    const expISO = localInputToISO(expiresAt);
+    if (pubISO === undefined) return 'Publish date must be YYYY-MM-DD or YYYY-MM-DD HH:mm';
+    if (expISO === undefined) return 'Expiry date must be YYYY-MM-DD or YYYY-MM-DD HH:mm';
+    if (pubISO && expISO && new Date(expISO) <= new Date(pubISO))
       return 'Expires must be after publish date';
     return null;
   };
@@ -133,8 +138,11 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
     fd.append('priority', priority);
     fd.append('status', canPublish ? statusChoice : 'draft');
     fd.append('audience', JSON.stringify(audience));
-    if (publishedAt) fd.append('publishedAt', publishedAt);
-    if (expiresAt) fd.append('expiresAt', expiresAt);
+    // Local input → full ISO instant (UTC "Z"), so the server never guesses a zone.
+    const pubISO = localInputToISO(publishedAt);
+    const expISO = localInputToISO(expiresAt);
+    if (pubISO) fd.append('publishedAt', pubISO);
+    if (expISO) fd.append('expiresAt', expISO);
     if (isPinned) fd.append('isPinned', 'true');
     if (requiresAck) fd.append('requiresAck', 'true');
     if (attachment) {
@@ -287,7 +295,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                 <TextInput
                   value={publishedAt}
                   onChangeText={setPublishedAt}
-                  placeholder="optional"
+                  placeholder="YYYY-MM-DD HH:mm"
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"
@@ -302,7 +310,7 @@ export default function ComposeAnnouncementModal({ open, onClose }) {
                 <TextInput
                   value={expiresAt}
                   onChangeText={setExpiresAt}
-                  placeholder="optional"
+                  placeholder="YYYY-MM-DD HH:mm"
                   placeholderTextColor={C.mutedSoft}
                   keyboardType="numbers-and-punctuation"
                   autoCapitalize="none"

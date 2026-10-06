@@ -20,6 +20,7 @@ import {
   usePublishAnnouncement,
 } from '../../../../src/hooks/useAnnouncements';
 import { useUserStore } from '../../../../src/store/userStore';
+import { canActOnBranch } from '../../../../src/utils/permissions';
 import { useColors } from '../../../../src/theme/useColors';
 import { COLORS } from '../../../../src/theme/colors';
 import {
@@ -57,21 +58,24 @@ export default function AnnouncementDetailScreen() {
 
   const actions = user?.role?.actions || [];
   const isAdmin = !!user?.role?.isPredefined;
-  const canUpdate =
-    isAdmin ||
-    actions.includes('update-announcement') ||
-    actions.includes('update-all-branch-announcement');
-  const canDelete =
-    isAdmin ||
-    actions.includes('delete-announcement') ||
-    actions.includes('delete-all-branch-announcement');
-  const canPublish = isAdmin || actions.includes('publish-announcement');
+  const canPublishAction = isAdmin || actions.includes('publish-announcement');
   const canViewStats =
     isAdmin ||
     actions.includes('view-announcement') ||
     actions.includes('view-all-branch-announcement');
 
   const { data: a, isLoading, isError, error, refetch } = useAnnouncementDetail({ id: announcementId });
+
+  // Branch reach (API rule): a branch-tier manager only manages notices of
+  // their own branch — never another branch's, nor a school-wide one (no
+  // branchId), which belongs to the org level.
+  const canUpdate = canActOnBranch(user, 'update-announcement', a?.branchId);
+  // Publish/archive also run the update branch check server-side.
+  const canPublish = canPublishAction && canUpdate;
+  // Deleting a live notice withdraws it from readers — a publish decision.
+  const canDelete =
+    canActOnBranch(user, 'delete-announcement', a?.branchId) &&
+    (a?.status !== 'published' || canPublishAction);
 
   const markRead = useMarkAnnouncementRead();
   const acknowledge = useAcknowledgeAnnouncement();

@@ -32,7 +32,7 @@ import {
   formatMoney,
   todayISO,
 } from '../../../../../src/constants/staffSalary';
-import { hasAnyAction } from '../../../../../src/utils/permissions';
+import { canActOnBranch } from '../../../../../src/utils/permissions';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 
@@ -155,10 +155,15 @@ export default function PayslipDetailPage() {
 
   const { data: payslip, isLoading, error } = usePayslipDetail({ id: payslipId });
 
-  const canUpdate = hasAnyAction(user?.role, ['update-payslip', 'update-all-branch-payslip']);
-  const canPay = hasAnyAction(user?.role, ['pay-payslip', 'pay-all-branch-payslip']);
-  const canCancel = hasAnyAction(user?.role, ['cancel-payslip', 'cancel-all-branch-payslip']);
-  // Reversing an instalment undoes a payment: the server wants pay AND cancel.
+  // Branch reach: the branch-tier action only covers payslips of the user's own
+  // branch; another branch's payslip needs the *-all-branch-* action (API rule).
+  const payslipBranchId = payslip?.branchId;
+  const canUpdate = canActOnBranch(user, 'update-payslip', payslipBranchId);
+  const canPay = canActOnBranch(user, 'pay-payslip', payslipBranchId);
+  const canCancel = canActOnBranch(user, 'cancel-payslip', payslipBranchId);
+  // Reversing an instalment undoes a payment: the server wants pay AND cancel,
+  // and for another branch's payslip both at org (all-branch) level — which is
+  // exactly what canPay/canCancel resolve to off-branch.
   const canReverse = canPay && canCancel;
 
   const [editing, setEditing] = useState(false);

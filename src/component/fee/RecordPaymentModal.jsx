@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -35,27 +35,32 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState(null);
-  // One key per opened modal, reused on retries so a resubmit can't double-record.
-  const [idempotencyKey, setIdempotencyKey] = useState(null);
+  // One key per payment attempt: minted on open and again after every recorded
+  // payment, reused only for retries of the same unsubmitted attempt so a
+  // resubmit after a lost response can't double-record.
+  const idempotencyKeyRef = useRef(null);
 
-  // Keyed on `open` alone so a voucher refetch while open can't mint a new key.
+  // Reset on the open transition only. Keyed on `open` alone: a voucher
+  // refetch while open (e.g. after this payment invalidated it) must neither
+  // mint a new key nor wipe the receipt being shown.
   useEffect(() => {
-    if (open) setIdempotencyKey(newIdempotencyKey());
+    if (!open) return;
+    idempotencyKeyRef.current = newIdempotencyKey();
+    setAmount(voucher?.balanceAmount != null ? String(voucher.balanceAmount) : '');
+    setPaymentDate(todayYMD());
+    setMethod('cash');
+    setReferenceNumber('');
+    setNotes('');
+    setReceipt(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  useEffect(() => {
-    if (open) {
-      setAmount(voucher?.balanceAmount != null ? String(voucher.balanceAmount) : '');
-      setPaymentDate(todayYMD());
-      setMethod('cash');
-      setReferenceNumber('');
-      setNotes('');
-      setReceipt(null);
-    }
-  }, [open, voucher]);
-
   const mut = useRecordPayment({
-    onSuccess: (d) => setReceipt(d),
+    onSuccess: (d) => {
+      // This attempt is recorded; the next payment must not replay it.
+      idempotencyKeyRef.current = newIdempotencyKey();
+      setReceipt(d);
+    },
   });
 
   const refRequired = REFERENCE_REQUIRED_METHODS.includes(method);
@@ -86,7 +91,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
     };
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();
     if (notes.trim()) payload.notes = notes.trim();
-    mut.mutate({ ...payload, idempotencyKey });
+    mut.mutate({ ...payload, idempotencyKey: idempotencyKeyRef.current });
   };
 
   if (!voucher) return null;

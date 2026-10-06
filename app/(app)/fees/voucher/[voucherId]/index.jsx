@@ -11,7 +11,7 @@ import {
 import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
-import { hasAnyAction } from '../../../../../src/utils/permissions';
+import { canActOnBranch, hasAnyAction } from '../../../../../src/utils/permissions';
 import {
   VOUCHER_STATUS_PILL,
   formatDate,
@@ -61,10 +61,9 @@ export default function VoucherDetailPage() {
 
   const { data: v, isLoading, error } = useVoucherDetail({ id: voucherId });
 
-  const canRecordPayment = hasAnyAction(user?.role, [
-    'record-payment',
-    'record-all-branch-payment',
-  ]);
+  // Branch reach: `record-payment` only covers the user's own branch; another
+  // branch's voucher needs `record-all-branch-payment` (API rule).
+  const canRecordPayment = canActOnBranch(user, 'record-payment', v?.branchId);
   const canUpdate = hasAnyAction(user?.role, ['update-fee', 'update-all-branch-fee']);
   const canDelete = hasAnyAction(user?.role, ['delete-fee', 'delete-all-branch-fee']);
   const canGenerate = hasAnyAction(user?.role, ['generate-voucher', 'generate-all-branch-voucher']);

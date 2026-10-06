@@ -198,7 +198,8 @@ export default function StructuresPanel() {
   let refetch = () => {};
   let error = null;
   if (isOwnOnly) {
-    const d = ownStaffStructure.data?.data ?? ownStaffStructure.data;
+    // The hook resolves to the structure or null (none active) — never the envelope.
+    const d = ownStaffStructure.data || null;
     rows = d ? (Array.isArray(d) ? d : [d]) : [];
     total = rows.length;
     isLoading = ownStaffStructure.isLoading;

@@ -81,6 +81,44 @@ export function toYMD(iso) {
   return d.toISOString().slice(0, 10);
 }
 
+// Announcement times are instants. Inputs are typed in the device's local
+// time as "YYYY-MM-DD" or "YYYY-MM-DD HH:mm"; they go to the API as full ISO
+// strings (UTC, with "Z") so the server never has to guess a timezone.
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// ISO instant → local input string ("" when empty/invalid). Midnight shows as a
+// bare date so a date-only notice round-trips unchanged.
+export function toLocalDateTimeInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  if (d.getHours() === 0 && d.getMinutes() === 0) return date;
+  return `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+// Local input string → ISO instant. Returns null for an empty input and
+// undefined for one that can't be parsed (caller reports the error).
+export function localInputToISO(value) {
+  const v = (value || '').trim();
+  if (!v) return null;
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/);
+  if (!m) return undefined;
+  const [, y, mo, d, hh = '0', mm = '0'] = m;
+  const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh), Number(mm));
+  // Reject roll-overs like 2026-02-31 or 25:00.
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getMonth() !== Number(mo) - 1 ||
+    date.getDate() !== Number(d) ||
+    date.getHours() !== Number(hh) ||
+    date.getMinutes() !== Number(mm)
+  ) {
+    return undefined;
+  }
+  return date.toISOString();
+}
+
 export function formatBytes(n) {
   const num = Number(n) || 0;
   if (num < 1024) return `${num} B`;

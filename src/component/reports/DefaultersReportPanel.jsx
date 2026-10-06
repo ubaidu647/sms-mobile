@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -89,6 +89,13 @@ export default function DefaultersReportPanel() {
   const rows = report?.rows || [];
   const byBranch = report?.byBranch || [];
   const totals = report?.totals;
+
+  // A page past the end (e.g. the last defaulters just paid) steps back.
+  useEffect(() => {
+    if (!isFetching && report && rows.length === 0 && page > 1) {
+      setPage((p) => Math.max(1, p - 1));
+    }
+  }, [isFetching, report, rows.length, page]);
 
   const generate = () => {
     setFilterError('');

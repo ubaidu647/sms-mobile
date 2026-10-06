@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
@@ -19,7 +19,7 @@ export function useStudentList({ page, limit, filters, branchId, enabled = true 
   return useQuery({
     queryKey: ['students', page, limit, params],
     queryFn: () => fetchData({ url: '/student/list', page, limit, ...params }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled,
   });
 }

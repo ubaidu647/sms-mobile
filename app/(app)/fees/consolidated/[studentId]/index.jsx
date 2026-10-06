@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,7 +22,7 @@ import {
 import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
-import { hasAnyAction } from '../../../../../src/utils/permissions';
+import { canActOnBranch } from '../../../../../src/utils/permissions';
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -43,18 +43,32 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
   const [method, setMethod] = useState('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
-  // One key per opening of the modal, reused on retries so a resubmit can't double-record.
-  const [idempotencyKey, setIdempotencyKey] = useState(null);
+  // One key per payment attempt: minted on open and again after every recorded
+  // payment, reused only for retries of the same unsubmitted attempt so a
+  // resubmit after a lost response can't double-record.
+  const idempotencyKeyRef = useRef(null);
+
+  // Reset on the open transition only: every open starts from the current
+  // outstanding with a blank reference, and an outstanding refetch while open
+  // neither wipes the form nor mints a new key.
   useEffect(() => {
-    if (open) setIdempotencyKey(newIdempotencyKey());
+    if (!open) return;
+    idempotencyKeyRef.current = newIdempotencyKey();
+    setAmount(outstanding > 0 ? String(outstanding) : '');
+    setPaymentDate(todayYMD());
+    setMethod('cash');
+    setReferenceNumber('');
+    setNotes('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  if (open && amount === '' && outstanding > 0) {
-    // initial fill — but only once per open
-    setAmount(String(outstanding));
-  }
-
-  const pay = useRecordConsolidatedPayment({ onSuccess: () => onClose() });
+  const pay = useRecordConsolidatedPayment({
+    onSuccess: () => {
+      // This attempt is recorded; the next payment must not replay it.
+      idempotencyKeyRef.current = newIdempotencyKey();
+      onClose();
+    },
+  });
 
   const refRequired = REFERENCE_REQUIRED_METHODS.includes(method);
 
@@ -79,7 +93,7 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
     const payload = { studentId, amount: num, paymentDate, method };
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();
     if (notes.trim()) payload.notes = notes.trim();
-    pay.mutate({ ...payload, idempotencyKey });
+    pay.mutate({ ...payload, idempotencyKey: idempotencyKeyRef.current });
   };
 
   return (
@@ -250,9 +264,11 @@ export default function ConsolidatedPage() {
   const C = useColors();
   const { user } = useUserStore();
 
-  const canPay = hasAnyAction(user?.role, ['record-payment', 'record-all-branch-payment']);
-
   const { data: slip, isLoading, error } = useConsolidatedView({ studentId });
+
+  // Branch reach: `record-payment` only covers the user's own branch; another
+  // branch's student needs `record-all-branch-payment` (API rule).
+  const canPay = canActOnBranch(user, 'record-payment', slip?.student?.branch);
   const [payOpen, setPayOpen] = useState(false);
 
   if (isLoading) {

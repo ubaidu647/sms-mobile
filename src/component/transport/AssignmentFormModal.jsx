@@ -29,8 +29,23 @@ import {
   toYMD,
 } from '../../constants/transport';
 import { currentAcademicYear } from '../../constants/fee';
+import { changedFields } from '../../utils/changedFields';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+
+/** What the edit form shows for `assignment` when it opens (same rules as its fields). */
+const initialEditValues = (assignment) => {
+  const routeObj = typeof assignment.route === 'object' ? assignment.route : null;
+  return {
+    routeId: routeObj?._id || assignment.routeId?._id || assignment.routeId || '',
+    stopName: assignment.stopName || '',
+    direction: assignment.direction || 'both',
+    monthlyFee: assignment.monthlyFee ?? '',
+    notes: assignment.notes || '',
+    status: assignment.status || 'active',
+    endDate: toYMD(assignment.endDate),
+  };
+};
 
 export default function AssignmentFormModal({ open, assignment, onClose }) {
   const C = useColors();
@@ -137,20 +152,31 @@ export default function AssignmentFormModal({ open, assignment, onClose }) {
       Toast.show({ type: 'error', text1: 'Invalid', text2: err });
       return;
     }
-    const payload = { routeId, stopName, direction };
-    if (monthlyFee !== '' && !Number.isNaN(Number(monthlyFee)))
-      payload.monthlyFee = Number(monthlyFee);
-    if (notes.trim()) payload.notes = notes.trim();
-    if (!isEdit) {
-      payload.studentId = studentId;
-      payload.academicYear = academicYear;
-      payload.startDate = startDate;
-      createMutation.mutate(payload);
-    } else {
-      payload.status = status;
-      if (endDate) payload.endDate = endDate;
-      updateMutation.mutate(payload);
+    const fee =
+      monthlyFee !== '' && !Number.isNaN(Number(monthlyFee)) ? Number(monthlyFee) : undefined;
+    if (isEdit) {
+      // Only what was changed: an ended assignment refuses even its own end
+      // date, so re-sending the form's untouched fields would block the edit.
+      const changed = changedFields(initialEditValues(assignment), {
+        routeId,
+        stopName,
+        direction,
+        ...(fee !== undefined ? { monthlyFee: fee } : {}),
+        notes: notes.trim(),
+        status,
+        endDate: endDate || null,
+      });
+      if (!Object.keys(changed).length) {
+        onClose();
+        return;
+      }
+      updateMutation.mutate(changed);
+      return;
     }
+    const payload = { routeId, stopName, direction, studentId, academicYear, startDate };
+    if (fee !== undefined) payload.monthlyFee = fee;
+    if (notes.trim()) payload.notes = notes.trim();
+    createMutation.mutate(payload);
   };
 
   return (

@@ -62,7 +62,8 @@ export default function GeneratePayslipModal({ open, onClose }) {
     staffId,
     enabled: open && !!staffId,
   });
-  const struct = activeStruct?.data ?? activeStruct;
+  // The hook resolves to the structure or null (none active) — never the envelope.
+  const struct = activeStruct || null;
   const noStruct = !!staffId && !structLoading && !struct;
 
   const gen = useGeneratePayslip({ onSuccess: () => onClose() });
