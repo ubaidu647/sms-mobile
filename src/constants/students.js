@@ -1,3 +1,5 @@
+import { localYMD } from '../utils/localDate';
+
 export const GENDERS = ['male', 'female', 'other'];
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -47,5 +49,5 @@ export function currentAcademicYear() {
 }
 
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localYMD();
 }

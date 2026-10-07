@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,8 +23,10 @@ import {
   formatMoney,
 } from '../../constants/staffSalary';
 import { hasAnyAction, resolveScope } from '../../utils/permissions';
+import { pageCount } from '../../utils/pagination';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import ReportPager from '../ReportPager';
 import StructureFormModal from './StructureFormModal';
 
 function StructureRow({ item, canUpdate, canDelete, onEdit, onDeactivate, C }) {
@@ -155,10 +157,18 @@ export default function StructuresPanel() {
     user?.branch?._id ||
     '';
 
-  const [branchId, setBranchId] = useState(isOrgLevel ? '' : userBranchId);
-  const [staffId, setStaffId] = useState('');
-  const [isActive, setIsActive] = useState('true');
+  const [branchId, setBranchIdState] = useState(isOrgLevel ? '' : userBranchId);
+  const [staffId, setStaffIdState] = useState('');
+  const [isActive, setIsActiveState] = useState('true');
   const [page, setPage] = useState(1);
+  // Any filter change starts over at page 1; the old page may not exist anymore.
+  const withPageReset = (setter) => (value) => {
+    setter(value);
+    setPage(1);
+  };
+  const setBranchId = withPageReset(setBranchIdState);
+  const setStaffId = withPageReset(setStaffIdState);
+  const setIsActive = withPageReset(setIsActiveState);
   const [limit] = useState(20);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -214,6 +224,14 @@ export default function StructuresPanel() {
     refetch = listQuery.refetch;
     error = listQuery.error;
   }
+  const totalPages = pageCount(total, limit);
+
+  // Deactivating can drop a row out of the "Active" filter; step back if this
+  // page no longer exists.
+  const listData = listQuery.data;
+  useEffect(() => {
+    if (!isOwnOnly && listData && page > totalPages) setPage(totalPages);
+  }, [isOwnOnly, listData, page, totalPages]);
 
   const onDeactivate = (row) => {
     const name =
@@ -408,6 +426,22 @@ export default function StructuresPanel() {
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={Header}
+        ListFooterComponent={
+          !isOwnOnly && total > 0 ? (
+            <View style={styles.pager}>
+              <ReportPager
+                page={page}
+                limit={limit}
+                shown={rows.length}
+                total={total}
+                truncated={false}
+                onPage={setPage}
+                noun="structures"
+                C={C}
+              />
+            </View>
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         renderItem={({ item }) => (
           <StructureRow
@@ -527,6 +561,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+
+  pager: { marginTop: 12 },
 
   empty: { alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyText: { fontSize: 14 },

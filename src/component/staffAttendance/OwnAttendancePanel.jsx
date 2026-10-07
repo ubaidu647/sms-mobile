@@ -16,14 +16,9 @@ import {
   formatWorkedMinutes,
   todayISO,
 } from '../../constants/staffAttendance';
+import { monthsAgoYMD } from '../../utils/localDate';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
-
-function monthsAgoISO(n) {
-  const d = new Date();
-  d.setMonth(d.getMonth() - n);
-  return d.toISOString().slice(0, 10);
-}
 
 function fmtDate(value) {
   if (!value) return '—';
@@ -39,7 +34,7 @@ export default function OwnAttendancePanel() {
   const { user } = useUserStore();
   const staffId = user?.staffId;
 
-  const [from, setFrom] = useState(monthsAgoISO(1));
+  const [from, setFrom] = useState(monthsAgoYMD(1));
   const [to, setTo] = useState(todayISO());
   const [month, setMonth] = useState(currentMonth());
 

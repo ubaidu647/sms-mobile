@@ -222,6 +222,7 @@ export function useGenerateBulkPayslips({ onSuccess } = {}) {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['payslips'] });
       queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
       const d = res?.data;
       Toast.show({
         type: 'success',
@@ -248,6 +249,7 @@ export function useUpdatePayslip({ id, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['payslips'] });
       queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
       Toast.show({ type: 'success', text1: res?.message || 'Payslip updated' });
       onSuccess?.(res?.data);
     },
@@ -269,6 +271,7 @@ export function useFinalizePayslip({ id, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['payslips'] });
       queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
       Toast.show({ type: 'success', text1: res?.message || 'Payslip finalized' });
       onSuccess?.(res?.data);
     },
@@ -295,6 +298,7 @@ export function usePayPayslip({ id, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['payslips'] });
       queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
       Toast.show({ type: 'success', text1: res?.message || 'Payslip marked paid' });
       onSuccess?.(res?.data);
     },
@@ -341,6 +345,7 @@ export function useCancelPayslip({ id, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['payslips'] });
       queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
       Toast.show({ type: 'success', text1: res?.message || 'Payslip cancelled' });
       onSuccess?.(res?.data);
     },

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Linking,
   Modal,
   Pressable,
   StyleSheet,
@@ -19,6 +18,7 @@ import {
   useRemoveAttachment,
 } from '../../hooks/useAnnouncements';
 import { formatBytes, formatDateTime, validateFile } from '../../constants/announcement';
+import { openSafeUrl } from '../../utils/openSafeUrl';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -150,7 +150,7 @@ export default function ManageAttachmentsModal({ open, announcement, onClose }) 
                   </Text>
                 </View>
                 <Pressable
-                  onPress={() => Linking.openURL(item.url).catch(() => {})}
+                  onPress={() => openSafeUrl(item.url)}
                   hitSlop={6}
                   style={({ pressed }) => [
                     styles.iconBtn,

@@ -8,6 +8,19 @@ import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
 
+// Pickers cache their own lists, so every write must refresh them too or a
+// form keeps offering a retired vehicle / missing a new route.
+function invalidateVehicleLists(queryClient) {
+  queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+  queryClient.invalidateQueries({ queryKey: ['vehicles-dropdown'] });
+  queryClient.invalidateQueries({ queryKey: ['vehicles-active-dropdown'] });
+}
+
+function invalidateRouteLists(queryClient) {
+  queryClient.invalidateQueries({ queryKey: ['routes'] });
+  queryClient.invalidateQueries({ queryKey: ['routes-dropdown'] });
+}
+
 // ────────────── Vehicles ──────────────
 
 export function useVehiclesList({
@@ -97,7 +110,7 @@ export function useCreateVehicle({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      invalidateVehicleLists(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Vehicle created' });
       onSuccess?.(res?.data);
     },
@@ -116,7 +129,7 @@ export function useUpdateVehicle({ id, onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      invalidateVehicleLists(queryClient);
       queryClient.invalidateQueries({ queryKey: ['vehicle-detail', id] });
       Toast.show({ type: 'success', text1: res?.message || 'Vehicle updated' });
       onSuccess?.(res?.data);
@@ -136,7 +149,7 @@ export function useDeleteVehicle({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      invalidateVehicleLists(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Vehicle retired' });
       onSuccess?.(res);
     },
@@ -221,7 +234,7 @@ export function useCreateRoute({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['routes'] });
+      invalidateRouteLists(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Route created' });
       onSuccess?.(res?.data);
     },
@@ -240,7 +253,7 @@ export function useUpdateRoute({ id, onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['routes'] });
+      invalidateRouteLists(queryClient);
       queryClient.invalidateQueries({ queryKey: ['route-detail', id] });
       // A vehicle swap moves the route's riders, so rosters/assignments change too.
       queryClient.invalidateQueries({ queryKey: ['transport-assignments'] });
@@ -264,7 +277,7 @@ export function useDeleteRoute({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['routes'] });
+      invalidateRouteLists(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Route deactivated' });
       onSuccess?.(res);
     },

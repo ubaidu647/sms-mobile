@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Linking,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { openSafeUrl } from '../../utils/openSafeUrl';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import {
@@ -47,7 +47,7 @@ export default function FeedPanel() {
   const acknowledge = useAcknowledgeAnnouncement();
 
   const openLink = useCallback((url) => {
-    if (url) Linking.openURL(url).catch(() => {});
+    if (url) openSafeUrl(url);
   }, []);
 
   const renderItem = ({ item: a }) => (

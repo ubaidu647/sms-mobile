@@ -1,4 +1,7 @@
 // Mirror of sms-frontend/src/constants/staffSalary.js. Keep in sync.
+import { localYMD } from '../utils/localDate';
+import { round2 } from '../utils/money';
+
 export const COMPONENT_TYPES = ['fixed', 'percent'];
 
 export const PAYSLIP_STATUSES = ['draft', 'finalized', 'partially-paid', 'paid', 'cancelled'];
@@ -67,7 +70,7 @@ export function previousMonth() {
 }
 
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localYMD();
 }
 
 export function formatMonth(ym) {
@@ -91,7 +94,8 @@ export function formatDate(iso) {
 }
 
 export function formatMoney(n, currency = 'PKR') {
-  const num = Number(n) || 0;
+  // Rounded to paisa so float noise (33333 × 7.5%) never shows as 2499.975.
+  const num = round2(n);
   const sym = currency === 'PKR' ? '₨' : currency;
   return `${sym} ${num.toLocaleString()}`;
 }

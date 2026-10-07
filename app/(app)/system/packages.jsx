@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -104,6 +104,11 @@ export default function PackagesScreen() {
   const rows = data?.data ?? [];
   const total = data?.total ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // A delete can shrink the list; don't strand the user on a page past the end.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
 
   const del = useDeletePackage({ onSuccess: () => setDeleteTarget(null) });
 

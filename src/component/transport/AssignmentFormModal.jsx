@@ -30,6 +30,7 @@ import {
 } from '../../constants/transport';
 import { currentAcademicYear } from '../../constants/fee';
 import { assignmentEditChanges } from '../../utils/changedFields';
+import { localYMD } from '../../utils/localDate';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -98,7 +99,7 @@ export default function AssignmentFormModal({ open, assignment, onClose }) {
       setDirection('both');
       setMonthlyFee('');
       setAcademicYear(currentAcademicYear());
-      setStartDate(toYMD(new Date().toISOString()));
+      setStartDate(localYMD());
       setEndDate('');
       setStatus('active');
       setNotes('');

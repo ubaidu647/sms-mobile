@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -87,6 +87,8 @@ export default function AssignmentsPanel() {
     branchId: isOrgLevel ? filters.branchId : undefined,
   });
   const allRows = data?.data || [];
+  // The API has no search param for assignments, so this only narrows the page
+  // already loaded; the UI says so rather than implying a full search.
   const term = search.trim().toLowerCase();
   const rows = term
     ? allRows.filter((a) =>
@@ -103,6 +105,11 @@ export default function AssignmentsPanel() {
     : allRows;
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / 20));
+
+  // A delete can shrink the list; don't strand the user on a page past the end.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
 
   const { data: branchData } = useBranchesDropdown({ enabled: isOrgLevel });
   const branches = branchData?.data || [];
@@ -211,10 +218,16 @@ export default function AssignmentsPanel() {
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="Search student / route / stop…"
+          placeholder="Search this page: student / route / stop…"
           placeholderTextColor={C.mutedSoft}
           style={[styles.searchInput, { backgroundColor: C.card, borderColor: C.border, color: C.text }]}
         />
+        {!!term && (
+          <Text style={[styles.searchHint, { color: C.muted }]}>
+            {`Showing ${rows.length} of ${allRows.length} on page ${page} of ${totalPages} only. `}
+            Use Filters to search across all assignments.
+          </Text>
+        )}
       </View>
       <View style={[styles.toolbar2, { borderBottomColor: C.border }]}>
         <Pressable
@@ -267,7 +280,10 @@ export default function AssignmentsPanel() {
           <Feather name="user-x" size={32} color={C.mutedSoft} />
           <Text style={[styles.emptyTitle, { color: C.text }]}>No assignments</Text>
           <Text style={[styles.emptySub, { color: C.muted, textAlign: 'center' }]}>
-            {activeFiltersCount || term
+            {term
+              ? `Nothing on page ${page} of ${totalPages} matches "${search.trim()}". ` +
+                'Clear the search to browse other pages, or use Filters.'
+              : activeFiltersCount
               ? 'No assignments match your filters.'
               : canCreate
               ? 'Tap Assign to add the first one.'
@@ -582,6 +598,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     borderBottomWidth: 0,
   },
+  searchHint: { fontSize: 11, marginTop: 6 },
   searchInput: {
     height: 40,
     borderWidth: 1,

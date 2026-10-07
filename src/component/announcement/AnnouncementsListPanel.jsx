@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -94,6 +94,11 @@ export default function AnnouncementsListPanel() {
   const rows = data?.data || [];
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / 20));
+
+  // A delete can shrink the list; don't strand the user on a page past the end.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
 
   const { data: branchData } = useBranchesDropdown({ enabled: isOrgLevel });
   const branches = branchData?.data || [];

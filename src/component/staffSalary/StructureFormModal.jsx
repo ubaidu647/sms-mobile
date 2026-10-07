@@ -21,6 +21,7 @@ import {
   useUpdateStructure,
 } from '../../hooks/useStaffSalary';
 import { COMPONENT_TYPES, formatMoney, toYMD } from '../../constants/staffSalary';
+import { componentTotal, round2 } from '../../utils/money';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -99,18 +100,13 @@ export default function StructureFormModal({ open, onClose, structure }) {
   }, [staffId, staffList, isEdit]);
 
   const totals = useMemo(() => {
+    // Same maths as the API's payroll, rounded to paisa.
     const basic = Number(basicSalary) || 0;
-    const sum = (arr) =>
-      arr.reduce((s, c) => {
-        const amt = Number(c.amount) || 0;
-        if (c.type === 'percent') return s + (basic * amt) / 100;
-        return s + amt;
-      }, 0);
-    const totalAllowance = sum(allowances);
-    const totalDeduction = sum(deductions);
+    const totalAllowance = componentTotal(basic, allowances);
+    const totalDeduction = componentTotal(basic, deductions);
     return {
-      gross: basic + totalAllowance,
-      net: basic + totalAllowance - totalDeduction,
+      gross: round2(basic + totalAllowance),
+      net: round2(basic + totalAllowance - totalDeduction),
       totalAllowance,
       totalDeduction,
     };

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +25,7 @@ import {
   titleCase,
 } from '../../constants/fee';
 import { hasAnyAction, resolveScope } from '../../utils/permissions';
+import { pageCount } from '../../utils/pagination';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import SmallActionModal from './SmallActionModal';
@@ -113,12 +114,22 @@ export default function PaymentsPanel() {
     user?.branch?._id ||
     '';
 
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [method, setMethod] = useState('');
-  const [isVoid, setIsVoid] = useState('false');
-  const [branchId, setBranchId] = useState('');
+  const [fromDate, setFromDateState] = useState('');
+  const [toDate, setToDateState] = useState('');
+  const [method, setMethodState] = useState('');
+  const [isVoid, setIsVoidState] = useState('false');
+  const [branchId, setBranchIdState] = useState('');
   const [page, setPage] = useState(1);
+  // Any filter change starts over at page 1; the old page may not exist anymore.
+  const withPageReset = (setter) => (value) => {
+    setter(value);
+    setPage(1);
+  };
+  const setFromDate = withPageReset(setFromDateState);
+  const setToDate = withPageReset(setToDateState);
+  const setMethod = withPageReset(setMethodState);
+  const setIsVoid = withPageReset(setIsVoidState);
+  const setBranchId = withPageReset(setBranchIdState);
   const [limit] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
   const [voidTarget, setVoidTarget] = useState(null);
@@ -136,7 +147,12 @@ export default function PaymentsPanel() {
   });
   const rows = data?.data || [];
   const total = data?.total ?? rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const totalPages = pageCount(total, limit);
+
+  // Voiding can shrink the list; don't strand the user on a page past the end.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
 
   const voidMut = useVoidPayment({
     id: voidTarget?._id,

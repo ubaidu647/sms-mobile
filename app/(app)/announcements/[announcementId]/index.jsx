@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,7 @@ import {
 } from '../../../../src/hooks/useAnnouncements';
 import { useUserStore } from '../../../../src/store/userStore';
 import { canActOnBranch } from '../../../../src/utils/permissions';
+import { openSafeUrl } from '../../../../src/utils/openSafeUrl';
 import { useColors } from '../../../../src/theme/useColors';
 import { COLORS } from '../../../../src/theme/colors';
 import {
@@ -273,7 +273,7 @@ export default function AnnouncementDetailScreen() {
             {a.attachments.map((att) => (
               <Pressable
                 key={att._id || att.url}
-                onPress={() => Linking.openURL(att.url).catch(() => {})}
+                onPress={() => openSafeUrl(att.url)}
                 style={({ pressed }) => [
                   styles.attachRow,
                   { backgroundColor: C.bg, borderColor: C.border },

@@ -4,6 +4,9 @@ import { QueryClient } from '@tanstack/react-query';
 // immediately and let the screen show the error; anything else gets the usual
 // few retries.
 const retryUnless4xx = (failureCount, err) => {
+  // A 401 whose token refresh failed only because we were offline / the API was
+  // briefly down is tagged retryable by apiClient; the refresh may succeed next time.
+  if (err?.isRetryable) return failureCount < 3;
   const status = err?.response?.status ?? err?.status;
   if (status >= 400 && status < 500) return false;
   return failureCount < 3;

@@ -1,3 +1,5 @@
+import { addDaysYMD, localYM, localYMD, startOfWeekYMD } from '../utils/localDate';
+
 export const ATTENDANCE_STATUSES = [
   'present',
   'absent',
@@ -26,12 +28,11 @@ export const PERCENTAGE_COLOR = (p) => {
 };
 
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localYMD();
 }
 
 export function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return localYM();
 }
 
 export function currentAcademicYear() {
@@ -39,18 +40,13 @@ export function currentAcademicYear() {
   return `${y}-${y + 1}`;
 }
 
+// Monday of the week containing `dateISO` ('YYYY-MM-DD').
 export function startOfWeek(dateISO) {
-  const d = new Date(dateISO);
-  const day = d.getDay(); // 0 = Sun, 1 = Mon, ...
-  const diff = (day + 6) % 7; // days since Monday
-  d.setDate(d.getDate() - diff);
-  return d.toISOString().slice(0, 10);
+  return startOfWeekYMD(dateISO);
 }
 
 export function addDaysISO(dateISO, n) {
-  const d = new Date(dateISO);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return addDaysYMD(dateISO, n);
 }
 
 export function weekDates(weekStartISO) {

@@ -21,6 +21,7 @@ import {
   useUpdatePayslip,
 } from '../../../../../src/hooks/useStaffSalary';
 import { newIdempotencyKey } from '../../../../../src/utils/idempotency';
+import { componentAmount } from '../../../../../src/utils/money';
 import { useUserStore } from '../../../../../src/store/userStore';
 import {
   PAYMENT_METHODS,
@@ -290,14 +291,7 @@ export default function PayslipDetailPage() {
             <LineRow
               key={i}
               label={`${a.name}${a.type === 'percent' ? ` (${a.amount}%)` : ''}`}
-              value={
-                a.type === 'percent'
-                  ? formatMoney(
-                      ((Number(payslip.basicSalary) || 0) * (Number(a.amount) || 0)) / 100,
-                      cur,
-                    )
-                  : formatMoney(a.amount, cur)
-              }
+              value={formatMoney(componentAmount(payslip.basicSalary, a), cur)}
               C={C}
             />
           ))}
@@ -327,14 +321,7 @@ export default function PayslipDetailPage() {
             <LineRow
               key={i}
               label={`${d.name}${d.type === 'percent' ? ` (${d.amount}%)` : ''}`}
-              value={
-                d.type === 'percent'
-                  ? formatMoney(
-                      ((Number(payslip.basicSalary) || 0) * (Number(d.amount) || 0)) / 100,
-                      cur,
-                    )
-                  : formatMoney(d.amount, cur)
-              }
+              value={formatMoney(componentAmount(payslip.basicSalary, d), cur)}
               C={C}
             />
           ))}

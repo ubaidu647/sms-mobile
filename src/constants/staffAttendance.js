@@ -1,4 +1,6 @@
 // Mirror of sms-frontend/src/constants/staffAttendance.js. Keep in sync.
+import { localYM, localYMD } from '../utils/localDate';
+
 export const STAFF_ATTENDANCE_STATUSES = [
   'present',
   'absent',
@@ -72,11 +74,11 @@ export const NEEDS_REASON = ['absent', 'leave', 'half-day', 'late'];
 export const ALLOWS_TIMES = ['present', 'late', 'half-day'];
 
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localYMD();
 }
 
 export function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
+  return localYM();
 }
 
 export function formatWorkedMinutes(mins) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -195,6 +195,11 @@ export default function StructuresPanel() {
   const rows = data?.data || [];
   const total = data?.total ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  // A delete can shrink the list; don't strand the user on a page past the end.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
 
   const del = useDeleteFeeStructure();
   const onDelete = (s) => {

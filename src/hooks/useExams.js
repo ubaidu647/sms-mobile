@@ -235,6 +235,11 @@ export function useEnterMarks({ examId, onSuccess } = {}) {
       onSuccess?.(res?.data);
     },
     onError: (err) => {
+      // A 400 usually means the exam was published (locked) under us; refetch it
+      // so the marks screen flips to read-only instead of retrying forever.
+      if (err?.response?.status === 400) {
+        queryClient.invalidateQueries({ queryKey: ['exam-detail', examId] });
+      }
       const msg = err?.response?.data?.message || err?.message || 'Save failed';
       Toast.show({ type: 'error', text1: 'Save failed', text2: msg });
     },

@@ -249,6 +249,11 @@ export default function TeacherAssignmentsScreen() {
   const total = data?.total ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  // A delete can shrink the list; don't strand the user on a page past the end.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
+
   // Client-side filter by teacher name search (web does the same).
   const filteredRows = useMemo(() => {
     if (!staffSearch.trim()) return rows;

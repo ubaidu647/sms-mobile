@@ -47,6 +47,11 @@ export const hasAnyAction = (role, keys) => {
 // Matches web middleware which keys off role.name === 'super-admin'.
 export const isSuperAdmin = (role) => role?.name === 'super-admin';
 
+// Where a signed-in user lands: super-admins in the system module, everyone
+// else on the school dashboard.
+export const homeHref = (role) =>
+  isSuperAdmin(role) ? '/(app)/system/organizations' : '/(app)/dashboard';
+
 // ── Branch reach ──
 // A branch-tier action (`pay-payslip`) only covers records of the user's own
 // branch; another branch's record needs the org-tier `*-all-branch-*` action.

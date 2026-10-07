@@ -28,6 +28,7 @@ import {
   titleCase,
 } from '../../constants/fee';
 import { hasAnyAction } from '../../utils/permissions';
+import { monthsAgoYMD } from '../../utils/localDate';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import ReportPager from '../ReportPager';
@@ -515,11 +516,7 @@ function DefaultersReport({ C }) {
     'student-defaults-list-view-all-branch',
   ]);
 
-  const [from, setFrom] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 3);
-    return d.toISOString().slice(0, 10);
-  });
+  const [from, setFrom] = useState(() => monthsAgoYMD(3));
   const [to, setTo] = useState(todayYMD());
   const [minOutstanding, setMinOutstanding] = useState('');
   const [page, setPage] = useState(1);
