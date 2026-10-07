@@ -29,7 +29,7 @@ import {
   toYMD,
 } from '../../constants/transport';
 import { currentAcademicYear } from '../../constants/fee';
-import { changedFields } from '../../utils/changedFields';
+import { assignmentEditChanges } from '../../utils/changedFields';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -157,7 +157,8 @@ export default function AssignmentFormModal({ open, assignment, onClose }) {
     if (isEdit) {
       // Only what was changed: an ended assignment refuses even its own end
       // date, so re-sending the form's untouched fields would block the edit.
-      const changed = changedFields(initialEditValues(assignment), {
+      // A route or stop change also sends the fee on screen, so what is shown is saved.
+      const changed = assignmentEditChanges(initialEditValues(assignment), {
         routeId,
         stopName,
         direction,

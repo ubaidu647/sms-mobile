@@ -22,7 +22,15 @@ import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 import { hasAnyAction } from '../../../../../src/utils/permissions';
-import { buildMarkEntries, savedStudentIds, toMark } from '../../../../../src/utils/marksEntries';
+import {
+  buildMarkEntries,
+  cleanMarkInput,
+  invalidMarkStudents,
+  noteEdit,
+  releaseSavedEdits,
+  savedStudentIds,
+  toMark,
+} from '../../../../../src/utils/marksEntries';
 import {
   EXAM_STATUS_PILL,
   GRADE_PILL,
@@ -83,7 +91,7 @@ export default function MarksEntryPage() {
   // Students the user has typed into for the current subject+section. Their
   // entries are never overwritten by a refetch; only untouched rows are
   // (re)seeded from the server. Switching subject/section starts fresh.
-  const editedRef = useRef(new Set());
+  const editedRef = useRef(new Map());
   const seededScopeRef = useRef(null);
   const scopeKey = `${examId}|${examSubjectId}|${sectionId}`;
 
@@ -91,7 +99,7 @@ export default function MarksEntryPage() {
     const scopeChanged = seededScopeRef.current !== scopeKey;
     if (scopeChanged) {
       seededScopeRef.current = scopeKey;
-      editedRef.current = new Set();
+      editedRef.current = new Map();
     }
     const byStudent = new Map();
     existingResults.forEach((er) => {
@@ -112,7 +120,7 @@ export default function MarksEntryPage() {
   }, [scopeKey, students, existingResults]);
 
   const updateMark = (studentId, patch) => {
-    editedRef.current.add(studentId);
+    noteEdit(editedRef.current, studentId);
     setMarks((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }));
   };
 
@@ -145,14 +153,7 @@ export default function MarksEntryPage() {
     return { absent, entered, total: students.length };
   }, [marks, students.length]);
 
-  // Once saved, the server copy is authoritative again — let the post-save
-  // refetch re-seed every row.
-  const enter = useEnterMarks({
-    examId,
-    onSuccess: () => {
-      editedRef.current = new Set();
-    },
-  });
+  const enter = useEnterMarks({ examId });
 
   const handleSave = () => {
     if (!examSubjectId || !sectionId) {
@@ -161,6 +162,17 @@ export default function MarksEntryPage() {
     }
     if (!students.length) {
       Toast.show({ type: 'error', text1: 'No students in this section' });
+      return;
+    }
+    const invalid = invalidMarkStudents(students, marks, { hasTheory, hasPractical });
+    if (invalid.length) {
+      const names = invalid.map((s) => s.user?.name || s.rollNumber || s._id);
+      const more = names.length > 3 ? ` +${names.length - 3} more` : '';
+      Toast.show({
+        type: 'error',
+        text1: 'Some marks are not valid numbers',
+        text2: `${names.slice(0, 3).join(', ')}${more}`,
+      });
       return;
     }
     const entries = buildMarkEntries(students, marks, {
@@ -172,7 +184,14 @@ export default function MarksEntryPage() {
       Toast.show({ type: 'error', text1: 'Enter at least one mark (or mark a student absent)' });
       return;
     }
-    enter.mutate({ examSubjectId, sectionId, entries });
+    // Once saved, the server copy is authoritative again for the rows this
+    // save sent — let the post-save refetch re-seed those. Rows typed into
+    // while the save was in flight stay protected.
+    const edited = new Map(editedRef.current);
+    enter.mutate(
+      { examSubjectId, sectionId, entries },
+      { onSuccess: () => releaseSavedEdits(editedRef.current, edited) },
+    );
   };
 
   if (examLoading) {
@@ -529,7 +548,7 @@ function MarkInput({ label, value, max, disabled, onChange, C }) {
       <Text style={[styles.markLabel, { color: C.mutedSoft }]}>{label}</Text>
       <TextInput
         value={value || ''}
-        onChangeText={(v) => onChange(v.replace(/[^0-9.]/g, ''))}
+        onChangeText={(v) => onChange(cleanMarkInput(v))}
         editable={!disabled}
         keyboardType="decimal-pad"
         style={[

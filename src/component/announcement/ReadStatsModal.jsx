@@ -18,12 +18,24 @@ import QueryErrorState from '../QueryErrorState';
 export default function ReadStatsModal({ open, announcement, onClose }) {
   const C = useColors();
   const id = announcement?._id;
-  const { data: stats, isLoading, isError, error } = useAnnouncementReadStats({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useAnnouncementReadStats({
     id,
     enabled: open && !!id,
   });
 
-  const reads = stats?.reads || [];
+  const pages = data?.pages || [];
+  // Counts come from the newest page; readers are every page loaded so far.
+  const stats = pages[pages.length - 1];
+  const reads = pages.flatMap((p) => p?.reads || []);
+  const totalReads = stats?.totalReads ?? 0;
   const requiresAck = !!stats?.requiresAck;
 
   if (!announcement) return null;
@@ -96,6 +108,30 @@ export default function ReadStatsModal({ open, announcement, onClose }) {
                   Nobody has read this yet.
                 </Text>
               </View>
+            }
+            ListFooterComponent={
+              reads.length > 0 && totalReads > reads.length ? (
+                <View style={styles.moreRow}>
+                  <Text style={[styles.moreText, { color: C.muted }]}>
+                    Showing first {reads.length} of {totalReads}
+                  </Text>
+                  <Pressable
+                    onPress={() => fetchNextPage()}
+                    disabled={!hasNextPage || isFetchingNextPage}
+                    style={({ pressed }) => [
+                      styles.moreBtn,
+                      { backgroundColor: C.bg, borderColor: C.border },
+                      (pressed || isFetchingNextPage) && { opacity: 0.6 },
+                    ]}
+                  >
+                    {isFetchingNextPage ? (
+                      <ActivityIndicator size="small" color={COLORS.brand} />
+                    ) : (
+                      <Text style={[styles.moreBtnText, { color: C.text }]}>Load more</Text>
+                    )}
+                  </Pressable>
+                </View>
+              ) : null
             }
             renderItem={({ item: r }) => (
               <View style={[styles.row, { backgroundColor: C.bg, borderColor: C.border }]}>
@@ -192,6 +228,18 @@ const styles = StyleSheet.create({
   },
   ackOn: { backgroundColor: '#d1fae5' },
   ackOff: { backgroundColor: '#f3f4f6' },
+
+  moreRow: { alignItems: 'center', gap: 8, paddingTop: 4 },
+  moreText: { fontSize: 12 },
+  moreBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  moreBtnText: { fontSize: 12, fontWeight: '700' },
 
   empty: { alignItems: 'center', padding: 32, gap: 8 },
   emptyText: { fontSize: 13 },

@@ -275,12 +275,22 @@ export function useAcknowledgeAnnouncement() {
   });
 }
 
+// The reader list is paged on the backend (counts cover every reader); each
+// page resolves to the stats payload `{ totalReads, ackCount, reads, ... }`.
 export function useAnnouncementReadStats({ id, enabled = true }) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['announcement-read-stats', id],
-    queryFn: async () => {
-      const { data } = await apiClient.get(`/announcement/${id}/read-stats`);
+    initialPageParam: 1,
+    queryFn: async ({ pageParam = 1 }) => {
+      const { data } = await apiClient.get(`/announcement/${id}/read-stats`, {
+        params: { page: pageParam, limit: 500 },
+      });
       return data?.data;
+    },
+    getNextPageParam: (last, allPages) => {
+      const total = last?.totalReads ?? 0;
+      const loaded = allPages.reduce((s, p) => s + (p?.reads?.length || 0), 0);
+      return loaded < total && last?.reads?.length ? allPages.length + 1 : undefined;
     },
     enabled: enabled && !!id,
     staleTime: 30_000,

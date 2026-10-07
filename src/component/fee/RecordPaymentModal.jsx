@@ -21,8 +21,8 @@ import {
   PAYMENT_METHOD_LABELS,
   REFERENCE_REQUIRED_METHODS,
   formatMoney,
-  todayYMD,
 } from '../../constants/fee';
+import { localYMD, paymentDateError } from '../../utils/paymentDate';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -30,7 +30,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
   const C = useColors();
 
   const [amount, setAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState(todayYMD());
+  const [paymentDate, setPaymentDate] = useState(localYMD());
   const [method, setMethod] = useState('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
@@ -47,7 +47,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
     if (!open) return;
     idempotencyKeyRef.current = newIdempotencyKey();
     setAmount(voucher?.balanceAmount != null ? String(voucher.balanceAmount) : '');
-    setPaymentDate(todayYMD());
+    setPaymentDate(localYMD());
     setMethod('cash');
     setReferenceNumber('');
     setNotes('');
@@ -83,10 +83,15 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
       Toast.show({ type: 'error', text1: 'Reference required for this method' });
       return;
     }
+    const dateError = paymentDateError(paymentDate);
+    if (dateError) {
+      Toast.show({ type: 'error', text1: 'Invalid payment date', text2: dateError });
+      return;
+    }
     const payload = {
       voucherId: voucher._id,
       amount: num,
-      paymentDate,
+      paymentDate: paymentDate.trim(),
       method,
     };
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();

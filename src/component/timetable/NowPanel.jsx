@@ -46,6 +46,11 @@ export default function NowPanel() {
   });
   const data = nowRes?.data;
   const slots = data?.slots || [];
+  // With All branches the branches can be in different periods: `period` is
+  // then null and `branches` carries each branch's own period.
+  const branchPeriods = data?.branches || [];
+  const inSession = !!data?.period || branchPeriods.length > 0;
+  const branchName = (id) => branches.find((b) => b._id === id)?.name || 'Branch';
 
   return (
     <ScrollView
@@ -67,6 +72,20 @@ export default function NowPanel() {
             <Text style={[styles.bannerSub, { color: C.muted }]}>
               {data.period.name} ({data.period.startTime} – {data.period.endTime})
             </Text>
+          ) : branchPeriods.length > 0 ? (
+            <>
+              <Text style={[styles.bannerSub, { color: C.muted }]}>Periods differ by branch</Text>
+              {branchPeriods.map((b) => (
+                <Text
+                  key={String(b.branchId)}
+                  style={[styles.bannerBranch, { color: C.mutedSoft }]}
+                  numberOfLines={1}
+                >
+                  {branchName(b.branchId)}: {b.period?.name} ({b.period?.startTime} –{' '}
+                  {b.period?.endTime})
+                </Text>
+              ))}
+            </>
           ) : (
             <Text style={[styles.bannerSub, { color: C.muted }]}>No active period</Text>
           )}
@@ -133,7 +152,7 @@ export default function NowPanel() {
         <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
           <Feather name="moon" size={28} color={C.mutedSoft} />
           <Text style={[styles.emptyText, { color: C.muted }]}>
-            {data?.period
+            {inSession
               ? 'No classes scheduled for this period.'
               : 'School is not in session right now.'}
           </Text>
@@ -202,6 +221,7 @@ const styles = StyleSheet.create({
   bannerLabel: { fontSize: 10, letterSpacing: 1.1, fontWeight: '800' },
   bannerTime: { fontSize: 18, fontWeight: '800', marginTop: 2 },
   bannerSub: { fontSize: 12, marginTop: 2 },
+  bannerBranch: { fontSize: 11, marginTop: 1 },
 
   card: { borderRadius: 14, padding: 12, borderWidth: 1, gap: 8 },
   label: { fontSize: 10, letterSpacing: 1.1, fontWeight: '700' },

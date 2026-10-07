@@ -91,6 +91,17 @@ export function useDeleteFeeStructure({ onSuccess } = {}) {
   });
 }
 
+// Every balance on screen (vouchers, payments, the consolidated slip and every
+// fee report — collection / outstanding / defaulters / …) moves on any voucher
+// or payment write, so each such write refreshes all of them.
+const FEE_QUERY_KEYS = ['payments', 'payment-detail', 'vouchers', 'voucher', 'fee-consolidated'];
+const invalidateFeeQueries = (queryClient) => {
+  for (const key of FEE_QUERY_KEYS) queryClient.invalidateQueries({ queryKey: [key] });
+  queryClient.invalidateQueries({
+    predicate: (q) => typeof q.queryKey?.[0] === 'string' && q.queryKey[0].startsWith('fee-report-'),
+  });
+};
+
 // ────────────── Vouchers ──────────────
 
 export function useVouchersList({ page = 1, limit = 20, filters, branchId, enabled = true }) {
@@ -131,7 +142,7 @@ export function useGenerateForSection({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
+      invalidateFeeQueries(queryClient);
       const d = res?.data;
       Toast.show({
         type: 'success',
@@ -155,7 +166,7 @@ export function useGenerateForStudent({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
+      invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Voucher generated' });
       onSuccess?.(res?.data);
     },
@@ -174,8 +185,7 @@ export function useVoidVoucher({ id, onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
-      queryClient.invalidateQueries({ queryKey: ['voucher', id] });
+      invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Voucher voided' });
       onSuccess?.(res?.data);
     },
@@ -194,7 +204,7 @@ export function useRegenerateVoucher({ id, onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
+      invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Voucher regenerated' });
       onSuccess?.(res?.data);
     },
@@ -213,7 +223,7 @@ export function useRegenerateForSection({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
+      invalidateFeeQueries(queryClient);
       const d = res?.data;
       Toast.show({
         type: 'success',
@@ -237,8 +247,7 @@ export function useAddLateFee({ id, onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
-      queryClient.invalidateQueries({ queryKey: ['voucher', id] });
+      invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Late fee updated' });
       onSuccess?.(res?.data);
     },
@@ -281,13 +290,6 @@ export function usePaymentDetail({ id, enabled = true }) {
   });
 }
 
-// Every fee report (collection / outstanding / defaulters / …) is derived from
-// payments, so any payment write must refresh all of them.
-const invalidateFeeReports = (queryClient) =>
-  queryClient.invalidateQueries({
-    predicate: (q) => typeof q.queryKey?.[0] === 'string' && q.queryKey[0].startsWith('fee-report-'),
-  });
-
 export function useRecordPayment({ onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -301,11 +303,7 @@ export function useRecordPayment({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
-      queryClient.invalidateQueries({ queryKey: ['voucher'] });
-      queryClient.invalidateQueries({ queryKey: ['fee-consolidated'] });
-      invalidateFeeReports(queryClient);
+      invalidateFeeQueries(queryClient);
       const r = res?.data?.payment?.receiptNumber;
       Toast.show({
         type: 'success',
@@ -329,12 +327,7 @@ export function useVoidPayment({ id, onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-detail', id] });
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
-      queryClient.invalidateQueries({ queryKey: ['voucher'] });
-      queryClient.invalidateQueries({ queryKey: ['fee-consolidated'] });
-      invalidateFeeReports(queryClient);
+      invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Payment voided' });
       onSuccess?.(res?.data);
     },
@@ -370,12 +363,8 @@ export function useRecordConsolidatedPayment({ onSuccess } = {}) {
       );
       return data;
     },
-    onSuccess: (res, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['fee-consolidated', vars.studentId] });
-      queryClient.invalidateQueries({ queryKey: ['vouchers'] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['voucher'] });
-      invalidateFeeReports(queryClient);
+    onSuccess: (res) => {
+      invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Payment recorded' });
       onSuccess?.(res?.data);
     },
