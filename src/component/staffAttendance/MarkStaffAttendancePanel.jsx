@@ -27,6 +27,7 @@ import {
   todayISO,
   titleCase,
 } from '../../constants/staffAttendance';
+import { isOnLeave } from '../../utils/leave';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -445,6 +446,12 @@ export default function MarkStaffAttendancePanel() {
                       {s.designation ? ` · ${s.designation}` : ''}
                     </Text>
                   </View>
+                  {isOnLeave(s.attendance) && (
+                    <View style={styles.onLeaveBadge}>
+                      <Feather name="calendar" size={11} color="#1e40af" />
+                      <Text style={styles.onLeaveText}>On leave</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.statusRow}>
@@ -723,6 +730,17 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   name: { fontSize: 14, fontWeight: '700' },
   meta: { fontSize: 11, marginTop: 2 },
+
+  onLeaveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#dbeafe',
+  },
+  onLeaveText: { color: '#1e40af', fontSize: 10, fontWeight: '800' },
 
   statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   statusBtn: {

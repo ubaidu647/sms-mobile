@@ -195,6 +195,14 @@ export const ACTIONS = {
   VIEW_ALL_BRANCH_STAFF_SALARY_POLICY: 'view-all-branch-staff-salary-policy',
   UPDATE_ALL_BRANCH_STAFF_SALARY_POLICY: 'update-all-branch-staff-salary-policy',
 
+  VIEW_LEAVE: 'view-leave',
+  APPROVE_LEAVE: 'approve-leave',
+  MANAGE_LEAVE_POLICY: 'manage-leave-policy',
+  VIEW_ALL_BRANCH_LEAVE: 'view-all-branch-leave',
+  APPROVE_ALL_BRANCH_LEAVE: 'approve-all-branch-leave',
+  MANAGE_ALL_BRANCH_LEAVE_POLICY: 'manage-all-branch-leave-policy',
+  APPLY_OWN_LEAVE: 'apply-own-leave',
+
   VIEW_OWN_STAFF: 'view-own-staff',
   UPDATE_OWN_STAFF: 'update-own-staff',
   VIEW_OWN_SUBJECT: 'view-own-subject',
@@ -235,6 +243,8 @@ export const AVAILABLE_MENUS = [
   { key: 'salary-structure', label: 'Staff Salary — Structures' },
   { key: 'payslip', label: 'Staff Salary — Payslips' },
   { key: 'salary-policy', label: 'Staff Salary — Policy' },
+  { key: 'leave', label: 'Leave' },
+  { key: 'my-leave', label: 'My Leave' },
 ];
 
 export const AVAILABLE_ACTIONS = [
@@ -416,6 +426,13 @@ export const AVAILABLE_ACTIONS = [
   { key: ACTIONS.CREATE_ALL_BRANCH_STAFF_SALARY_POLICY, label: 'Create All Branch', menu: 'salary-policy' },
   { key: ACTIONS.UPDATE_ALL_BRANCH_STAFF_SALARY_POLICY, label: 'Update All Branch', menu: 'salary-policy' },
 
+  { key: ACTIONS.VIEW_LEAVE, label: 'View', menu: 'leave' },
+  { key: ACTIONS.APPROVE_LEAVE, label: 'Approve / Reject', menu: 'leave' },
+  { key: ACTIONS.MANAGE_LEAVE_POLICY, label: 'Manage Policy', menu: 'leave' },
+  { key: ACTIONS.VIEW_ALL_BRANCH_LEAVE, label: 'View All Branch', menu: 'leave' },
+  { key: ACTIONS.APPROVE_ALL_BRANCH_LEAVE, label: 'Approve All Branch', menu: 'leave' },
+  { key: ACTIONS.MANAGE_ALL_BRANCH_LEAVE_POLICY, label: 'Manage Policy All Branch', menu: 'leave' },
+
   { key: ACTIONS.VIEW_PAYSLIP, label: 'View', menu: 'payslip' },
   { key: ACTIONS.GENERATE_PAYSLIP, label: 'Generate', menu: 'payslip' },
   { key: ACTIONS.UPDATE_PAYSLIP, label: 'Edit/Finalize', menu: 'payslip' },
@@ -442,6 +459,7 @@ export const AVAILABLE_ACTIONS = [
   { key: ACTIONS.VIEW_OWN_TRANSPORT_ASSIGNMENT, label: 'View Own', menu: 'transport-assignment', scope: 'own' },
   { key: ACTIONS.VIEW_OWN_STAFF_SALARY, label: 'View Own', menu: 'salary-structure', scope: 'own' },
   { key: ACTIONS.VIEW_OWN_PAYSLIP, label: 'View Own', menu: 'payslip', scope: 'own' },
+  { key: ACTIONS.APPLY_OWN_LEAVE, label: 'Apply Own', menu: 'my-leave', scope: 'own' },
 ];
 
 export const PRESETS = {

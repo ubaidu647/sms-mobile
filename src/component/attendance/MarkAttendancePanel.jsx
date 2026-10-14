@@ -18,6 +18,7 @@ import {
   currentAcademicYear,
   todayISO,
 } from '../../constants/attendance';
+import { isOnLeave } from '../../utils/leave';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -261,6 +262,12 @@ export default function MarkAttendancePanel({ canMark }) {
                       #{idx + 1} · Roll {r.rollNumber || '—'}
                     </Text>
                   </View>
+                  {isOnLeave(r.attendance) && (
+                    <View style={styles.onLeaveBadge}>
+                      <Feather name="calendar" size={11} color="#3730a3" />
+                      <Text style={styles.onLeaveText}>On leave</Text>
+                    </View>
+                  )}
                   {!!status && (
                     <View style={[styles.currentPill, { backgroundColor: c.bg }]}>
                       <Feather name={c.icon} size={11} color={c.fg} />
@@ -497,6 +504,16 @@ const styles = StyleSheet.create({
   name: { fontSize: 14, fontWeight: '700' },
   meta: { fontSize: 11, marginTop: 2 },
 
+  onLeaveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#e0e7ff',
+  },
+  onLeaveText: { color: '#3730a3', fontSize: 10, fontWeight: '800' },
   currentPill: {
     flexDirection: 'row',
     alignItems: 'center',

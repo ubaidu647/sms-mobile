@@ -49,6 +49,8 @@ const SCHOOL_MENU = [
   { label: 'Students', tKey: 'students', icon: 'user', path: '/(app)/students', visible: (r) => canSee(r, 'view-student') },
   { label: 'Attendance', tKey: 'attendance', icon: 'check-square', path: '/(app)/attendance', visible: (r) => canSee(r, 'view-attendance') },
   { label: 'Staff Attendance', tKey: 'staffAttendance', icon: 'user-check', path: '/(app)/staff-attendance', visible: (r) => canSee(r, 'view-staff-attendance') },
+  { label: 'Leave', icon: 'calendar', path: '/(app)/leave', visible: (r) => canSee(r, 'view-leave') },
+  { label: 'My Leave', icon: 'sunrise', path: '/(app)/my-leave', visible: (r) => hasAnyAction(r, ['apply-own-leave']) },
   {
     label: 'Staff Salary',
     tKey: 'staffSalary',
