@@ -1,6 +1,8 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
+import { keptAsLeaveCount, keptAsLeaveMessage } from '../utils/leave';
+import { showWarnings } from './useLeave';
 
 // ───────── Daily / branch views ─────────
 
@@ -102,7 +104,9 @@ export function useUnmarkedStaffBranches({ date, enabled = true }) {
 export function useMarkStaffAttendance({ onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload) => {
+    // `roster` (the loaded rows) stays on the client: it is only used to tell
+    // which rows this save turned absent on an approved-leave day.
+    mutationFn: async ({ roster, ...payload }) => {
       const { data } = await apiClient.post('/staff-attendance/mark', payload);
       return data;
     },
@@ -117,11 +121,13 @@ export function useMarkStaffAttendance({ onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['staff-attendance-history'] });
       queryClient.invalidateQueries({ queryKey: ['staff-attendance-monthly'] });
       const { created = 0, updated = 0 } = res?.data || {};
+      const leaveNote = keptAsLeaveMessage(keptAsLeaveCount(vars.roster, vars.entries, 'staffId'));
       Toast.show({
         type: 'success',
         text1: 'Attendance saved',
-        text2: `${created} created · ${updated} updated`,
+        text2: `${created} created · ${updated} updated${leaveNote ? ` · ${leaveNote}` : ''}`,
       });
+      showWarnings(res);
       onSuccess?.(res?.data);
     },
     onError: (err) => {
@@ -145,6 +151,7 @@ export function useUpdateStaffAttendance({ onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['staff-attendance-history'] });
       queryClient.invalidateQueries({ queryKey: ['staff-attendance-monthly'] });
       Toast.show({ type: 'success', text1: res?.message || 'Attendance updated' });
+      showWarnings(res);
       onSuccess?.(res?.data);
     },
     onError: (err) => {

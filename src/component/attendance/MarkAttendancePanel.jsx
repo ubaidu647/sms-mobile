@@ -161,7 +161,7 @@ export default function MarkAttendancePanel({ canMark }) {
       })
       .filter(Boolean);
     if (entries.length === 0) return;
-    save.mutate({ classId, sectionId, date, academicYear, entries });
+    save.mutate({ classId, sectionId, date, academicYear, entries, roster });
   };
 
   const canSave = canMark && roster.length > 0 && classId && sectionId && date;

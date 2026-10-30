@@ -150,6 +150,29 @@ export const canCancelLeave = (req) => req?.status === 'pending' || req?.status 
 export const isOnLeave = (attendance) =>
   attendance?.status === 'leave' && !!attendance?.leaveRequestId;
 
+/**
+ * Rows this save changes to `absent` on a day an approved leave holds — the
+ * server keeps those as leave instead of marking them absent. Computed from the
+ * loaded roster vs the submitted entries, so rows that simply stay on leave
+ * are not counted. `idKey` is 'studentId' or 'staffId'.
+ */
+export function keptAsLeaveCount(roster, entries, idKey) {
+  const onLeave = new Set();
+  for (const row of Array.isArray(roster) ? roster : []) {
+    if (row && isOnLeave(row.attendance) && row[idKey] != null) onLeave.add(String(row[idKey]));
+  }
+  let n = 0;
+  for (const e of Array.isArray(entries) ? entries : []) {
+    if (e?.status === 'absent' && onLeave.has(String(e[idKey]))) n++;
+  }
+  return n;
+}
+
+/** Toast line for {@link keptAsLeaveCount}, or '' when none. */
+export function keptAsLeaveMessage(n) {
+  return n > 0 ? `${n} on approved leave ${n === 1 ? 'was' : 'were'} kept as leave` : '';
+}
+
 /** `warnings: string[]` from an approve/create response envelope (any nesting). */
 export function extractWarnings(res) {
   const w = res?.warnings ?? res?.data?.warnings;

@@ -69,9 +69,10 @@ export default function LeaveScreen() {
 
   const viewScope = resolveScope(user?.role, 'view-leave');
   const approveScope = resolveScope(user?.role, 'approve-leave');
-  const canView = viewScope === 'all' || viewScope === 'branch';
   const canApprove = approveScope === 'all' || approveScope === 'branch';
-  const isOrgLevel = viewScope === 'all';
+  // The API lets approvers list requests too (approve-leave / approve-all-branch-leave).
+  const canView = viewScope === 'all' || viewScope === 'branch' || canApprove;
+  const isOrgLevel = viewScope === 'all' || approveScope === 'all';
   const userBranchId = userBranchIdOf(user);
 
   const [applicantType, setApplicantType] = useState('');

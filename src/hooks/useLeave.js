@@ -43,7 +43,7 @@ function invalidateLeave(queryClient, { attendance = false } = {}) {
 
 // Payslip warnings (draft needs regenerating / finalized not reflected) can be
 // long and several, more than a toast shows, so they get a dismissable alert.
-function showWarnings(res) {
+export function showWarnings(res) {
   const warnings = extractWarnings(res);
   if (!warnings.length) return;
   Alert.alert(

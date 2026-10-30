@@ -306,7 +306,7 @@ export default function MarkStaffAttendancePanel() {
       payloadEntries.push(entry);
     }
 
-    mark.mutate({ branchId: effectiveBranchId, date, entries: payloadEntries });
+    mark.mutate({ branchId: effectiveBranchId, date, entries: payloadEntries, roster });
   };
 
   const allHoliday =

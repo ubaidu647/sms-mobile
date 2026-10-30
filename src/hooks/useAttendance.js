@@ -1,6 +1,8 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
+import { keptAsLeaveCount, keptAsLeaveMessage } from '../utils/leave';
+import { showWarnings } from './useLeave';
 
 /**
  * Sections the caller may mark: [{ classId, sectionId, className, sectionName }].
@@ -116,7 +118,9 @@ export function useStudentSummary({ studentId, month, enabled = true }) {
 export function useMarkAttendance({ onSuccess } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload) => {
+    // `roster` (the loaded rows) stays on the client: it is only used to tell
+    // which rows this save turned absent on an approved-leave day.
+    mutationFn: async ({ roster, ...payload }) => {
       const { data } = await apiClient.post('/attendance/mark', payload);
       return data;
     },
@@ -127,7 +131,9 @@ export function useMarkAttendance({ onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['attendance-summary'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-unmarked'] });
       const msg = res?.message || 'Attendance saved';
-      Toast.show({ type: 'success', text1: msg });
+      const leaveNote = keptAsLeaveMessage(keptAsLeaveCount(vars.roster, vars.entries, 'studentId'));
+      Toast.show({ type: 'success', text1: msg, ...(leaveNote ? { text2: leaveNote } : {}) });
+      showWarnings(res);
       onSuccess?.(res?.data);
     },
     onError: (err) => {

@@ -15,6 +15,8 @@ import {
   isOnLeave,
   isValidYMD,
   sortBalanceRows,
+  keptAsLeaveCount,
+  keptAsLeaveMessage,
   sortPendingFirst,
   validateLeaveForm,
   ymdOf,
@@ -161,4 +163,40 @@ test('formatLeaveRange and applicantMeta', () => {
     '5 · A · #12',
   );
   assert.equal(applicantMeta({ kind: 'staff', designation: 'Teacher' }), 'Teacher');
+});
+
+test('keptAsLeaveCount counts only rows changed to absent on a leave day', () => {
+  const leave = { status: 'leave', leaveRequestId: 'r1' };
+  const roster = [
+    { studentId: 'a', attendance: leave },
+    { studentId: 'b', attendance: leave },
+    { studentId: 'c', attendance: { status: 'present' } },
+  ];
+  assert.equal(
+    keptAsLeaveCount(roster, [{ studentId: 'a', status: 'leave' }, { studentId: 'b', status: 'leave' }], 'studentId'),
+    0,
+  );
+  assert.equal(
+    keptAsLeaveCount(
+      roster,
+      [
+        { studentId: 'a', status: 'absent' },
+        { studentId: 'b', status: 'present' },
+        { studentId: 'c', status: 'absent' },
+      ],
+      'studentId',
+    ),
+    1,
+  );
+  assert.equal(
+    keptAsLeaveCount([{ staffId: 's', attendance: leave }], [{ staffId: 's', status: 'absent' }], 'staffId'),
+    1,
+  );
+  assert.equal(keptAsLeaveCount(undefined, undefined, 'staffId'), 0);
+});
+
+test('keptAsLeaveMessage', () => {
+  assert.equal(keptAsLeaveMessage(0), '');
+  assert.equal(keptAsLeaveMessage(1), '1 on approved leave was kept as leave');
+  assert.equal(keptAsLeaveMessage(5), '5 on approved leave were kept as leave');
 });
