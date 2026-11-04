@@ -52,3 +52,8 @@ test('no user persists as null', () => {
   assert.equal(persistableUser(null), null);
   assert.equal(persistableUser(undefined), null);
 });
+
+test('keeps the forced password change flag', () => {
+  assert.equal(persistableUser({ _id: 'u1', mustChangePassword: true }).mustChangePassword, true);
+  assert.equal('mustChangePassword' in persistableUser({ _id: 'u1' }), false);
+});

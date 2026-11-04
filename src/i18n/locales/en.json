@@ -2,6 +2,7 @@
   "topbar": {
     "greeting": "Hello,",
     "settings": "Settings",
+    "changePassword": "Change password",
     "userManagement": "User Management",
     "logout": "Logout",
     "switchToLight": "Switch to light mode",

@@ -5,6 +5,7 @@ import {
   ACADEMIC_STATUSES,
   ADMISSION_TYPES,
 } from '../constants/students';
+import { PASSWORD_MIN, PASSWORD_MAX } from '../utils/changePassword';
 
 const optionalEmail = yup
   .string()
@@ -30,7 +31,12 @@ export const createStudentSchema = yup.object().shape({
   // Account
   name: yup.string().required('Name is required'),
   email: yup.string().email('Invalid email').required('Email is required'),
-  password: yup.string().min(6, 'Min 6 chars').optional(),
+  password: yup
+    .string()
+    .transform((v) => (v === '' ? undefined : v))
+    .min(PASSWORD_MIN, `Password must be at least ${PASSWORD_MIN} characters`)
+    .max(PASSWORD_MAX, `Password must be at most ${PASSWORD_MAX} characters`)
+    .optional(),
   phone: yup.string().optional(),
 
   // Enrollment

@@ -3,7 +3,8 @@
 // the role (actions/menus), the account type and the ids that scope queries.
 // Name, email, phone etc. are not stored; /auth/me re-fetches the full profile.
 
-const KEEP = ['role', 'type', 'staffType', 'branchName'];
+// mustChangePassword: a forced password change must survive an app restart.
+const KEEP = ['role', 'type', 'staffType', 'branchName', 'mustChangePassword'];
 const isIdKey = (k) => k === 'id' || k === '_id' || /(Id|_id)$/.test(k);
 
 export function persistableUser(user) {

@@ -35,10 +35,9 @@ export function currentMonth() {
   return localYM();
 }
 
-export function currentAcademicYear() {
-  const y = new Date().getFullYear();
-  return `${y}-${y + 1}`;
-}
+// The school's academic year (its own start month, else April) — one rule,
+// shared with every screen; see utils/academicYear.
+export { currentAcademicYear } from '../utils/academicYear';
 
 // Monday of the week containing `dateISO` ('YYYY-MM-DD').
 export function startOfWeek(dateISO) {

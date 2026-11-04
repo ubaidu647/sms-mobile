@@ -22,6 +22,11 @@ import {
 } from '../../hooks/useTimetable';
 import { hasAnyAction } from '../../utils/permissions';
 import {
+  buildTimetableSlots,
+  describeIncomplete,
+  incompleteKeys,
+} from '../../utils/timetableSlots';
+import {
   DAYS,
   DAY_LABELS,
   DAY_SHORT,
@@ -350,33 +355,28 @@ export default function EditorPanel() {
 
   const save = useBulkSaveSlots();
 
+  // Half-filled lesson cells (subject without teacher or vice versa). The save
+  // replaces the whole week, so dropping one would delete that lesson.
+  const { incomplete } = useMemo(
+    () => buildTimetableSlots(grid, periodConfig),
+    [grid, periodConfig],
+  );
+  const incompleteSet = useMemo(() => incompleteKeys(incomplete), [incomplete]);
+
   const handleSave = () => {
     if (!sectionId || !periodConfig) return;
-    const slots = [];
-    periodConfig.workingDays.forEach((d) => {
-      periodConfig.periods.forEach((p) => {
-        const cell = grid?.[d]?.[p.number];
-        if (p.type === 'lesson') {
-          if (!cell || !cell.subjectId || !cell.staffId) return;
-          slots.push({
-            day: d,
-            periodNumber: p.number,
-            slotType: 'lesson',
-            subjectId: cell.subjectId,
-            staffId: cell.staffId,
-            ...(cell.room ? { room: cell.room } : {}),
-            ...(cell.notes ? { notes: cell.notes } : {}),
-          });
-        } else {
-          slots.push({
-            day: d,
-            periodNumber: p.number,
-            slotType: p.type,
-            customLabel: p.name,
-          });
-        }
+    const built = buildTimetableSlots(grid, periodConfig);
+    if (built.incomplete.length) {
+      const first = built.incomplete[0];
+      if (first.day !== day) setDay(first.day);
+      Toast.show({
+        type: 'error',
+        text1: `${built.incomplete.length} lesson${built.incomplete.length === 1 ? ' is' : 's are'} incomplete — not saved`,
+        text2: describeIncomplete(built.incomplete, DAY_LABELS),
       });
-    });
+      return;
+    }
+    const { slots } = built;
     if (!slots.length) {
       Toast.show({ type: 'error', text1: 'Add at least one slot before saving' });
       return;
@@ -522,10 +522,15 @@ export default function EditorPanel() {
             const cfg = PERIOD_PILL[p.type] || PERIOD_PILL.other;
             const isLesson = p.type === 'lesson';
             const cell = grid?.[day]?.[p.number];
+            const isIncomplete = isLesson && incompleteSet.has(`${day}:${p.number}`);
             return (
               <View
                 key={p.number}
-                style={[styles.periodCard, { backgroundColor: C.card, borderColor: C.border }]}
+                style={[
+                  styles.periodCard,
+                  { backgroundColor: C.card, borderColor: C.border },
+                  isIncomplete && styles.periodCardIncomplete,
+                ]}
               >
                 <View style={styles.periodHeader}>
                   <View style={styles.numBadge}>
@@ -545,6 +550,13 @@ export default function EditorPanel() {
                     </Text>
                   </View>
                 </View>
+
+                {isIncomplete && (
+                  <Text style={styles.incompleteText}>
+                    {cell?.subjectId ? 'Pick a teacher' : 'Pick a subject'} — or clear both
+                    for no lesson.
+                  </Text>
+                )}
 
                 {isLesson ? (
                   <LessonCell
@@ -642,6 +654,8 @@ const styles = StyleSheet.create({
   primaryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   periodCard: { borderRadius: 14, padding: 12, borderWidth: 1, gap: 10 },
+  periodCardIncomplete: { borderColor: '#dc2626', borderWidth: 2 },
+  incompleteText: { color: '#b91c1c', fontSize: 12, fontWeight: '700' },
   periodHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   numBadge: {
     width: 28,

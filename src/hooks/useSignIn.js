@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import apiClient from '../services/apiClient';
 import { useAuth } from './useAuth';
 import { homeHref } from '../utils/permissions';
+import { mustChangePasswordOf } from '../utils/authErrors';
 
 export function useSignIn() {
   const { login } = useAuth();
@@ -19,7 +20,11 @@ export function useSignIn() {
       const payload = response.data || response;
       login(payload);
       Toast.show({ type: 'success', text1: 'Logged in successfully!' });
-      router.replace(homeHref(payload.user?.role));
+      // A forced password change comes first; the app layout keeps the user
+      // there until it is done.
+      router.replace(
+        mustChangePasswordOf(payload) ? '/(app)/change-password' : homeHref(payload.user?.role),
+      );
     },
     onError: (err) => {
       const message =

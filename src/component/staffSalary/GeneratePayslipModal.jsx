@@ -21,6 +21,11 @@ import {
   useStaffDropdown,
 } from '../../hooks/useStaffSalary';
 import { formatMoney, previousMonth } from '../../constants/staffSalary';
+import {
+  filterAmountInput,
+  parseAmountInput,
+  payslipMonthError,
+} from '../../utils/payslipInput';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -73,13 +78,24 @@ export default function GeneratePayslipModal({ open, onClose }) {
       Toast.show({ type: 'error', text1: 'Staff is required' });
       return;
     }
-    if (!month) {
-      Toast.show({ type: 'error', text1: 'Month is required' });
+    const monthError = payslipMonthError(month);
+    if (monthError) {
+      Toast.show({ type: 'error', text1: monthError });
       return;
     }
-    const payload = { staffId, month };
-    if (bonus !== '' && !Number.isNaN(Number(bonus))) payload.bonus = Number(bonus);
-    if (tax !== '' && !Number.isNaN(Number(tax))) payload.tax = Number(tax);
+    const bonusIn = parseAmountInput(bonus);
+    if (bonusIn.invalid) {
+      Toast.show({ type: 'error', text1: 'Bonus must be a valid amount' });
+      return;
+    }
+    const taxIn = parseAmountInput(tax);
+    if (taxIn.invalid) {
+      Toast.show({ type: 'error', text1: 'Tax must be a valid amount' });
+      return;
+    }
+    const payload = { staffId, month: month.trim() };
+    if (!bonusIn.empty) payload.bonus = bonusIn.value;
+    if (!taxIn.empty) payload.tax = taxIn.value;
     if (notes?.trim()) payload.notes = notes.trim();
     gen.mutate(payload);
   };
@@ -192,7 +208,7 @@ export default function GeneratePayslipModal({ open, onClose }) {
                 <Text style={[styles.label, { color: C.muted }]}>BONUS</Text>
                 <TextInput
                   value={bonus}
-                  onChangeText={(v) => setBonus(v.replace(/[^0-9.]/g, ''))}
+                  onChangeText={(v) => setBonus((prev) => filterAmountInput(v, prev))}
                   keyboardType="decimal-pad"
                   placeholder="optional"
                   placeholderTextColor={C.mutedSoft}
@@ -203,7 +219,7 @@ export default function GeneratePayslipModal({ open, onClose }) {
                 <Text style={[styles.label, { color: C.muted }]}>TAX</Text>
                 <TextInput
                   value={tax}
-                  onChangeText={(v) => setTax(v.replace(/[^0-9.]/g, ''))}
+                  onChangeText={(v) => setTax((prev) => filterAmountInput(v, prev))}
                   keyboardType="decimal-pad"
                   placeholder="optional"
                   placeholderTextColor={C.mutedSoft}

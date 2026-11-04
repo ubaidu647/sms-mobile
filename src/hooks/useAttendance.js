@@ -130,6 +130,9 @@ export function useMarkAttendance({ onSuccess } = {}) {
       });
       queryClient.invalidateQueries({ queryKey: ['attendance-summary'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-unmarked'] });
+      // A student's own history and month summary include this day too.
+      queryClient.invalidateQueries({ queryKey: ['attendance-student-history'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-student-summary'] });
       const msg = res?.message || 'Attendance saved';
       const leaveNote = keptAsLeaveMessage(keptAsLeaveCount(vars.roster, vars.entries, 'studentId'));
       Toast.show({ type: 'success', text1: msg, ...(leaveNote ? { text2: leaveNote } : {}) });

@@ -17,6 +17,7 @@ import {
   formatDate,
   titleCase,
 } from '../../../../../../src/constants/exam';
+import { missingPapersReason } from '../../../../../../src/utils/examResult';
 
 function Info({ label, value, C }) {
   return (
@@ -128,6 +129,7 @@ export default function ResultCardPage() {
 
   const { student, exam, subjects = [], summary } = card;
   const summaryGrade = GRADE_PILL[summary?.grade];
+  const missingReason = missingPapersReason(summary);
 
   return (
     <View style={[styles.safe, { backgroundColor: C.bg }]}>
@@ -236,11 +238,24 @@ export default function ResultCardPage() {
           </View>
         </View>
 
+        {!!missingReason && (
+          <View style={styles.missingBox}>
+            <Feather name="alert-circle" size={16} color="#991b1b" />
+            <Text style={styles.missingText}>{missingReason}</Text>
+          </View>
+        )}
+
         {summary.position != null && (
           <View style={[styles.infoBox, { backgroundColor: C.card, borderColor: C.border }]}>
             <Info
               label="Position"
-              value={summary.totalStudents ? `${summary.position} of ${summary.totalStudents}` : `${summary.position}`}
+              value={
+                !summary.position
+                  ? '—'
+                  : summary.totalStudentsInSection
+                    ? `${summary.position} of ${summary.totalStudentsInSection}`
+                    : `${summary.position}`
+              }
               C={C}
             />
           </View>
@@ -332,4 +347,15 @@ const styles = StyleSheet.create({
   resultPillBigText: { fontSize: 12, fontWeight: '800' },
 
   infoBox: { borderRadius: 14, padding: 12, borderWidth: 1 },
+  missingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    backgroundColor: '#fee2e2',
+    borderColor: '#fecaca',
+  },
+  missingText: { flex: 1, color: '#991b1b', fontSize: 13, fontWeight: '700' },
 });

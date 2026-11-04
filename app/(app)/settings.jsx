@@ -10,6 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
+import { useRouter } from 'expo-router';
 import { useThemeStore } from '../../src/store/themeStore';
 import { useLanguageStore, LANGUAGES } from '../../src/store/languageStore';
 import { useColors } from '../../src/theme/useColors';
@@ -53,6 +54,7 @@ export default function SettingsScreen() {
   const language = useLanguageStore((s) => s.language);
   const setLanguage = useLanguageStore((s) => s.setLanguage);
   const t = useTranslations('settings');
+  const router = useRouter();
 
   const [themeChoice, setThemeChoice] = useState(currentTheme);
 
@@ -187,6 +189,26 @@ export default function SettingsScreen() {
             <Feather name="info" size={12} color={C.mutedSoft} />
             <Text style={[styles.footnoteText, { color: C.muted }]}>{t('language.footnote')}</Text>
           </View>
+        </View>
+
+        {/* Security */}
+        <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Pressable
+            onPress={() => router.push('/(app)/change-password')}
+            style={({ pressed }) => [styles.sectionHeader, { borderBottomWidth: 0 }, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+          >
+            <View style={styles.sectionIconIndigo}>
+              <Feather name="lock" size={16} color="#4f46e5" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionTitle, { color: C.text }]}>Change password</Text>
+              <Text style={[styles.sectionSub, { color: C.muted }]}>
+                Update your password and sign out other devices.
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={C.mutedSoft} />
+          </Pressable>
         </View>
       </ScrollView>
     </View>

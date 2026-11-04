@@ -31,6 +31,7 @@ import {
 } from '../validation/staffSchema';
 import { useColors } from '../theme/useColors';
 import { COLORS } from '../theme/colors';
+import { PASSWORD_MIN } from '../utils/changePassword';
 
 function Section({ title, children }) {
   const C = useColors();
@@ -482,7 +483,7 @@ export default function StaffForm({
             <TextFieldCtl
               control={control}
               name="password"
-              placeholder="At least 6 characters"
+              placeholder={`At least ${PASSWORD_MIN} characters`}
               secureTextEntry
               autoCapitalize="none"
               error={errors.password}

@@ -19,6 +19,7 @@ import { useCreateSchool } from '../../hooks/useOrganizations';
 import { validateGraceDays, fmtMoney } from '../../constants/billing';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { PASSWORD_MIN, PASSWORD_MAX } from '../../utils/changePassword';
 
 const STATUSES = ['active', 'pending', 'suspended'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,8 +68,18 @@ export default function AddOrganizationModal({ open, onClose }) {
     if (!email.trim() || !EMAIL_RE.test(email.trim()))
       return Toast.show({ type: 'error', text1: 'A valid email is required' });
     if (!packageId) return Toast.show({ type: 'error', text1: 'Please choose a package' });
-    if (password && password.length < 6)
-      return Toast.show({ type: 'error', text1: 'Password must be at least 6 characters' });
+    // The school admin's first password — required, and the API's rule (8–128).
+    if (!password) return Toast.show({ type: 'error', text1: 'Admin password is required' });
+    if (password.length < PASSWORD_MIN)
+      return Toast.show({
+        type: 'error',
+        text1: `Password must be at least ${PASSWORD_MIN} characters`,
+      });
+    if (password.length > PASSWORD_MAX)
+      return Toast.show({
+        type: 'error',
+        text1: `Password must be at most ${PASSWORD_MAX} characters`,
+      });
     const graceErr = validateGraceDays(grace);
     if (graceErr) return Toast.show({ type: 'error', text1: graceErr });
 
@@ -218,7 +229,7 @@ export default function AddOrganizationModal({ open, onClose }) {
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
-                  placeholder="optional — min 6 chars"
+                  placeholder={`At least ${PASSWORD_MIN} characters`}
                   placeholderTextColor={C.mutedSoft}
                   secureTextEntry={!showPw}
                   autoCapitalize="none"

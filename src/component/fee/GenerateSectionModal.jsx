@@ -51,6 +51,7 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
   const [dueDate, setDueDate] = useState('');
   const [reason, setReason] = useState('');
   const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +63,7 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
     setDueDate('');
     setReason('');
     setResult(null);
+    setError('');
   }, [open, canAllBranch, userBranchId]);
 
   useEffect(() => {
@@ -88,8 +90,8 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
   });
   const sections = sectionData?.data || [];
 
-  const gen = useGenerateForSection({ onSuccess: (d) => setResult(d) });
-  const regen = useRegenerateForSection({ onSuccess: (d) => setResult(d) });
+  const gen = useGenerateForSection({ onSuccess: setResult, onError: setError });
+  const regen = useRegenerateForSection({ onSuccess: setResult, onError: setError });
   const mut = isRegenerate ? regen : gen;
 
   const submit = () => {
@@ -108,6 +110,7 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
     const payload = { sectionId, month };
     if (dueDate) payload.dueDate = dueDate;
     if (isRegenerate) payload.reason = reason.trim();
+    setError('');
     mut.mutate(payload);
   };
 
@@ -156,20 +159,42 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
             {result ? (
               <View style={styles.resultCard}>
                 <View style={styles.statRow}>
-                  <Stat label="Created" value={result.created ?? 0} bg="#dcfce7" fg="#166534" />
-                  <Stat label="Skipped" value={result.skipped ?? 0} bg="#fef3c7" fg="#92400e" />
-                  {result.voided != null && (
-                    <Stat label="Voided" value={result.voided} bg="#fee2e2" fg="#991b1b" />
+                  {result.regenerated != null && (
+                    <Stat
+                      label="Regenerated"
+                      value={result.regenerated}
+                      bg="#dbeafe"
+                      fg="#1e40af"
+                    />
                   )}
+                  <Stat label="Created" value={result.created} bg="#dcfce7" fg="#166534" />
+                  <Stat label="Skipped" value={result.skippedCount} bg="#fef3c7" fg="#92400e" />
                 </View>
 
-                {result.skipped > 0 && (result.skippedReasons || result.errors)?.length > 0 && (
-                  <View style={[styles.warnBox, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
-                    <Feather name="alert-triangle" size={14} color="#92400e" />
-                    <Text style={[styles.warnText, { color: '#92400e' }]}>
-                      Some students were skipped — they may already have a voucher for this month
-                      or be missing fee structure.
-                    </Text>
+                {result.skipped.length > 0 && (
+                  <View
+                    style={[
+                      styles.warnBox,
+                      styles.skipBox,
+                      { backgroundColor: '#fef3c7', borderColor: '#fde68a' },
+                    ]}
+                  >
+                    <View style={styles.skipHead}>
+                      <Feather name="alert-triangle" size={14} color="#92400e" />
+                      <Text style={[styles.warnText, { color: '#92400e', fontWeight: '700' }]}>
+                        {result.skipped.length === 1
+                          ? '1 student was skipped'
+                          : `${result.skipped.length} students were skipped`}
+                      </Text>
+                    </View>
+                    {result.skipped.map((s, i) => (
+                      <View key={`${s.studentId}-${i}`} style={styles.skipRow}>
+                        <Text style={[styles.skipName, { color: '#78350f' }]}>
+                          {s.name || `Student ${s.studentId.slice(-6)}`}
+                        </Text>
+                        <Text style={[styles.warnText, { color: '#92400e' }]}>{s.reason}</Text>
+                      </View>
+                    ))}
                   </View>
                 )}
 
@@ -364,6 +389,8 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
                   </View>
                 )}
 
+                {!!error && <ErrorBox message={error} />}
+
                 <Pressable
                   onPress={submit}
                   disabled={mut.isPending}
@@ -389,6 +416,15 @@ export default function GenerateSectionModal({ open, mode = 'generate', onClose 
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
+  );
+}
+
+function ErrorBox({ message }) {
+  return (
+    <View style={[styles.warnBox, { backgroundColor: '#fee2e2', borderColor: '#fecaca' }]}>
+      <Feather name="alert-circle" size={14} color="#991b1b" />
+      <Text style={[styles.warnText, { color: '#991b1b' }]}>{message}</Text>
+    </View>
   );
 }
 
@@ -474,4 +510,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   warnText: { fontSize: 12, flex: 1 },
+  skipBox: { flexDirection: 'column', alignItems: 'stretch' },
+  skipHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  skipRow: { gap: 2, paddingTop: 6 },
+  skipName: { fontSize: 12, fontWeight: '700' },
 });

@@ -30,6 +30,7 @@ import {
 } from '../validation/studentSchema';
 import { useColors } from '../theme/useColors';
 import { COLORS } from '../theme/colors';
+import { PASSWORD_MIN } from '../utils/changePassword';
 
 function Section({ title, children }) {
   const C = useColors();
@@ -502,7 +503,7 @@ export default function StudentForm({
             <TextFieldCtl
               control={control}
               name="password"
-              placeholder="Defaults to admission number"
+              placeholder={`Min ${PASSWORD_MIN} chars — defaults to admission number`}
               secureTextEntry
               autoCapitalize="none"
               error={errors.password}

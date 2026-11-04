@@ -3,6 +3,12 @@ import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
 import { idempotencyHeaders } from '../utils/idempotency';
+import {
+  apiErrorMessage,
+  normalizeSectionResult,
+  sectionResultSummary,
+  studentGenerateOutcome,
+} from '../utils/feeGeneration';
 
 // ────────────── Fee Structures ──────────────
 
@@ -134,7 +140,9 @@ export function useVoucherDetail({ id, enabled = true }) {
   });
 }
 
-export function useGenerateForSection({ onSuccess } = {}) {
+// Section runs: `onSuccess` gets the normalised result (see utils/feeGeneration).
+// With `onError` the caller shows the (often long) message inline; else a toast.
+export function useGenerateForSection({ onSuccess, onError } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload) => {
@@ -143,22 +151,25 @@ export function useGenerateForSection({ onSuccess } = {}) {
     },
     onSuccess: (res) => {
       invalidateFeeQueries(queryClient);
-      const d = res?.data;
+      const result = normalizeSectionResult(res?.data, 'generate');
       Toast.show({
-        type: 'success',
+        type: result.skippedCount > 0 ? 'info' : 'success',
         text1: 'Vouchers generated',
-        text2: `${d?.created || 0} created · ${d?.skipped || 0} skipped`,
+        text2: sectionResultSummary(result),
       });
-      onSuccess?.(d);
+      onSuccess?.(result);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed';
-      Toast.show({ type: 'error', text1: 'Generate failed', text2: msg });
+      const msg = apiErrorMessage(err);
+      if (onError) onError(msg);
+      else Toast.show({ type: 'error', text1: 'Generate failed', text2: msg });
     },
   });
 }
 
-export function useGenerateForStudent({ onSuccess } = {}) {
+// `onSuccess` only when a voucher was created; a 200 "not generated" response
+// goes to `onSkipped(reason)` so the form stays open and says why.
+export function useGenerateForStudent({ onSuccess, onSkipped, onError } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload) => {
@@ -166,13 +177,20 @@ export function useGenerateForStudent({ onSuccess } = {}) {
       return data;
     },
     onSuccess: (res) => {
+      const outcome = studentGenerateOutcome(res);
+      if (outcome.skipped) {
+        if (onSkipped) onSkipped(outcome.reason);
+        else Toast.show({ type: 'info', text1: 'Voucher not generated', text2: outcome.reason });
+        return;
+      }
       invalidateFeeQueries(queryClient);
       Toast.show({ type: 'success', text1: res?.message || 'Voucher generated' });
       onSuccess?.(res?.data);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed';
-      Toast.show({ type: 'error', text1: 'Generate failed', text2: msg });
+      const msg = apiErrorMessage(err);
+      if (onError) onError(msg);
+      else Toast.show({ type: 'error', text1: 'Generate failed', text2: msg });
     },
   });
 }
@@ -215,7 +233,7 @@ export function useRegenerateVoucher({ id, onSuccess } = {}) {
   });
 }
 
-export function useRegenerateForSection({ onSuccess } = {}) {
+export function useRegenerateForSection({ onSuccess, onError } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload) => {
@@ -224,17 +242,18 @@ export function useRegenerateForSection({ onSuccess } = {}) {
     },
     onSuccess: (res) => {
       invalidateFeeQueries(queryClient);
-      const d = res?.data;
+      const result = normalizeSectionResult(res?.data, 'regenerate');
       Toast.show({
-        type: 'success',
+        type: result.skippedCount > 0 ? 'info' : 'success',
         text1: 'Section regenerated',
-        text2: `${d?.created || 0} created · ${d?.skipped || 0} skipped`,
+        text2: sectionResultSummary(result),
       });
-      onSuccess?.(d);
+      onSuccess?.(result);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed';
-      Toast.show({ type: 'error', text1: 'Regenerate failed', text2: msg });
+      const msg = apiErrorMessage(err);
+      if (onError) onError(msg);
+      else Toast.show({ type: 'error', text1: 'Regenerate failed', text2: msg });
     },
   });
 }

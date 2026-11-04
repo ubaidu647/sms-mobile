@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { router } from 'expo-router';
-import apiClient from '../services/apiClient';
+import apiClient, { platformHeaders } from '../services/apiClient';
 import { useTokenStore } from '../store/tokenStore';
 import { useUserStore } from '../store/userStore';
 import { BACKEND_URL } from '../config/env';
 import { queryClient } from '../services/queryClient';
 import { bumpSessionGeneration, clearSession } from '../services/session';
+import { withPasswordFlag } from '../utils/authErrors';
 
 let logoutInFlight = false;
 
@@ -25,7 +26,8 @@ export const useAuth = () => {
     queryClient.clear();
     const u = data.userCreated || data.user;
     if (u && u.id && !u._id) u._id = u.id;
-    setUser(u);
+    // `mustChangePassword` (body or user) keeps the app on change-password.
+    setUser(withPasswordFlag(u, data));
     setTokens({
       accessToken: data.accessToken || data.token,
       refreshToken: data.refreshToken,
@@ -46,7 +48,7 @@ export const useAuth = () => {
           const me = res.data?.data?.user || res.data?.user;
           if (!me) return;
           if (me.id && !me._id) me._id = me.id;
-          setUser(me);
+          setUser(withPasswordFlag(me, res.data?.data || res.data));
         } catch (err) {
           console.warn('Failed to fetch /auth/me:', err?.message);
         } finally {
@@ -71,7 +73,7 @@ export const useAuth = () => {
         .post(
           `${BACKEND_URL}/auth/logout`,
           { refreshToken: rt },
-          { headers: { Authorization: `Bearer ${at}` } },
+          { headers: { ...platformHeaders, Authorization: `Bearer ${at}` } },
         )
         .catch(() => {});
     }

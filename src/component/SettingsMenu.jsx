@@ -59,6 +59,17 @@ export default function SettingsMenu({ open, anchor, onClose }) {
             }}
           />
 
+          <MenuRow
+            icon="lock"
+            label={t('changePassword')}
+            color={C.text}
+            iconColor={C.muted}
+            onPress={() => {
+              onClose();
+              router.push('/(app)/change-password');
+            }}
+          />
+
           {showUserMgmt && (
             <MenuRow
               icon="users"

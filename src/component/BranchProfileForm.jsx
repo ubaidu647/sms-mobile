@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Toast from 'react-native-toast-message';
 import { useUpsertBranchProfile } from '../hooks/useUpsertBranchProfile';
 import { useUserStore } from '../store/userStore';
+import { canEditBranchProfile } from '../utils/branchProfileAccess';
 import {
   SOCIAL_NETWORKS,
   IMAGE_FIELDS,
@@ -220,14 +221,11 @@ export default function BranchProfileForm({
 }) {
   const { user } = useUserStore();
 
-  const isAdmin = !!user?.role?.isPredefined;
-  const acts = user?.role?.actions || [];
-  const canEdit =
-    isAdmin ||
-    acts.includes('update-branch-profile') ||
-    acts.includes('create-branch-profile') ||
-    acts.includes('update-all-branch-profile') ||
-    acts.includes('create-all-branch-profile');
+  // Update vs create and own-branch vs any-branch, exactly as the API checks.
+  const canEdit = canEditBranchProfile(user, {
+    profileExists: !!initialProfile,
+    targetBranchId: branchId,
+  });
 
   const [profile, setProfile] = useState(blank);
   const [files, setFiles] = useState({});

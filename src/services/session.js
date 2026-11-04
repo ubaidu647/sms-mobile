@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useTokenStore } from '../store/tokenStore';
 import { useUserStore } from '../store/userStore';
 import { queryClient } from './queryClient';
+import { clearAcademicYearStartMonth } from '../utils/academicYear';
 
 // Session generation: bumped whenever the signed-in session ends or is
 // replaced. A token refresh started under an older generation must not write
@@ -22,6 +23,9 @@ export function clearSession() {
   useUserStore.getState().clearUser();
   queryClient.cancelQueries();
   queryClient.clear();
+  // The school's academic year month must not carry over to the next user: a
+  // slow or failed settings request for them falls back to the default.
+  clearAcademicYearStartMonth();
 }
 
 export function clearSessionAndRedirect() {

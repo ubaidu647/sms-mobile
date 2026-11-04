@@ -250,7 +250,7 @@ export default function PolicyPanel() {
           </Text>
           <Text style={[styles.emptyText, { color: C.muted }]}>
             Until a policy is set, payslip generation falls back to a simple pro-rate
-            (basic / working days × unpaid days).
+            (basic / 26 × unpaid days; absences and unpaid leave count 1, half-days ½).
           </Text>
           {canEdit && (
             <Pressable

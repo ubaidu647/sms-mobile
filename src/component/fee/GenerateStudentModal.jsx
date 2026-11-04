@@ -46,6 +46,8 @@ export default function GenerateStudentModal({ open, onClose }) {
   const [studentId, setStudentId] = useState('');
   const [month, setMonth] = useState(currentMonth());
   const [dueDate, setDueDate] = useState('');
+  // A refusal (409 etc.) or a "not generated" reason, shown in full in the form.
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +58,7 @@ export default function GenerateStudentModal({ open, onClose }) {
     setStudentId('');
     setMonth(currentMonth());
     setDueDate('');
+    setNotice(null);
   }, [open, canAllBranch, userBranchId]);
 
   useEffect(() => {
@@ -90,7 +93,11 @@ export default function GenerateStudentModal({ open, onClose }) {
   });
   const students = studentRes?.data || [];
 
-  const gen = useGenerateForStudent({ onSuccess: () => onClose() });
+  const gen = useGenerateForStudent({
+    onSuccess: () => onClose(),
+    onSkipped: (reason) => setNotice({ kind: 'skipped', message: reason }),
+    onError: (message) => setNotice({ kind: 'error', message }),
+  });
 
   const submit = () => {
     if (!studentId) {
@@ -103,6 +110,7 @@ export default function GenerateStudentModal({ open, onClose }) {
     }
     const payload = { studentId, month };
     if (dueDate) payload.dueDate = dueDate;
+    setNotice(null);
     gen.mutate(payload);
   };
 
@@ -337,6 +345,33 @@ export default function GenerateStudentModal({ open, onClose }) {
               </View>
             </View>
 
+            {notice && (
+              <View
+                style={[
+                  styles.noticeBox,
+                  notice.kind === 'error'
+                    ? { backgroundColor: '#fee2e2', borderColor: '#fecaca' }
+                    : { backgroundColor: '#fef3c7', borderColor: '#fde68a' },
+                ]}
+              >
+                <Feather
+                  name={notice.kind === 'error' ? 'alert-circle' : 'alert-triangle'}
+                  size={14}
+                  color={notice.kind === 'error' ? '#991b1b' : '#92400e'}
+                />
+                <Text
+                  style={[
+                    styles.noticeText,
+                    { color: notice.kind === 'error' ? '#991b1b' : '#92400e' },
+                  ]}
+                >
+                  {notice.kind === 'skipped'
+                    ? `Voucher not generated: ${notice.message}`
+                    : notice.message}
+                </Text>
+              </View>
+            )}
+
             <Pressable
               onPress={submit}
               disabled={gen.isPending}
@@ -417,4 +452,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  noticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  noticeText: { fontSize: 12, flex: 1, lineHeight: 17 },
 });

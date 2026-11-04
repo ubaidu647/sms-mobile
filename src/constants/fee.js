@@ -35,10 +35,9 @@ export const PAYMENT_METHOD_PILL = {
 
 export const REFERENCE_REQUIRED_METHODS = ['bank-transfer', 'cheque', 'online'];
 
-export function currentAcademicYear() {
-  const y = new Date().getFullYear();
-  return `${y}-${y + 1}`;
-}
+// The school's academic year (its own start month, else April) — one rule,
+// shared with every screen; see utils/academicYear.
+export { currentAcademicYear } from '../utils/academicYear';
 
 export function currentMonth() {
   const d = new Date();

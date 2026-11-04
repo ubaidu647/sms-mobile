@@ -22,6 +22,7 @@ import {
   previousMonth,
   titleCase,
 } from '../../constants/staffSalary';
+import { payslipMonthError } from '../../utils/payslipInput';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -63,11 +64,12 @@ export default function BulkPayrollModal({ open, onClose }) {
       Toast.show({ type: 'error', text1: 'Branch is required' });
       return;
     }
-    if (!month) {
-      Toast.show({ type: 'error', text1: 'Month is required' });
+    const monthError = payslipMonthError(month);
+    if (monthError) {
+      Toast.show({ type: 'error', text1: monthError });
       return;
     }
-    const payload = { branchId, month };
+    const payload = { branchId, month: month.trim() };
     if (staffType) payload.staffType = staffType;
     bulk.mutate(payload);
   };

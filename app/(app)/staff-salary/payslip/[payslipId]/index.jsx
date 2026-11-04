@@ -22,6 +22,7 @@ import {
 } from '../../../../../src/hooks/useStaffSalary';
 import { newIdempotencyKey } from '../../../../../src/utils/idempotency';
 import { componentAmount } from '../../../../../src/utils/money';
+import { filterAmountInput, parseAmountInput } from '../../../../../src/utils/payslipInput';
 import { useUserStore } from '../../../../../src/store/userStore';
 import {
   PAYMENT_METHODS,
@@ -226,9 +227,20 @@ export default function PayslipDetailPage() {
     'Staff';
 
   const saveEdits = () => {
+    // Empty means 0; anything else must parse — '5..' used to save as 0.
+    const bonusIn = parseAmountInput(bonus);
+    if (bonusIn.invalid) {
+      Toast.show({ type: 'error', text1: 'Bonus must be a valid amount' });
+      return;
+    }
+    const taxIn = parseAmountInput(tax);
+    if (taxIn.invalid) {
+      Toast.show({ type: 'error', text1: 'Tax must be a valid amount' });
+      return;
+    }
     const payload = {
-      bonus: Number(bonus) || 0,
-      tax: Number(tax) || 0,
+      bonus: bonusIn.value ?? 0,
+      tax: taxIn.value ?? 0,
     };
     if (notes !== (payslip.notes || '')) payload.notes = notes;
     update.mutate(payload);
@@ -300,7 +312,7 @@ export default function PayslipDetailPage() {
               <Text style={[styles.lineLabel, { color: C.text }]}>Bonus</Text>
               <TextInput
                 value={bonus}
-                onChangeText={(v) => setBonus(v.replace(/[^0-9.]/g, ''))}
+                onChangeText={(v) => setBonus((prev) => filterAmountInput(v, prev))}
                 keyboardType="decimal-pad"
                 style={styles.editInput}
               />
@@ -335,7 +347,7 @@ export default function PayslipDetailPage() {
               <Text style={[styles.lineLabel, { color: C.text }]}>Tax</Text>
               <TextInput
                 value={tax}
-                onChangeText={(v) => setTax(v.replace(/[^0-9.]/g, ''))}
+                onChangeText={(v) => setTax((prev) => filterAmountInput(v, prev))}
                 keyboardType="decimal-pad"
                 style={styles.editInput}
               />
@@ -562,7 +574,7 @@ export default function PayslipDetailPage() {
               <Feather name="alert-triangle" size={14} color="#92400e" />
               <Text style={[styles.warnText, { color: '#92400e' }]}>
                 No salary policy was active at generation time — pro-rate fallback used (basic ÷
-                working days × unpaid days).
+                26 × unpaid days; absences and unpaid leave count 1, half-days ½).
               </Text>
             </View>
           )
@@ -674,8 +686,15 @@ function PayForm({ payslip, onClose, C }) {
     const payload = { paymentDate, paymentMethod };
     if (paymentReference.trim()) payload.paymentReference = paymentReference.trim();
     // A fully deducted payslip (nothing owed) is settled without an amount.
-    if (remaining > 0 && paidAmount !== '' && !Number.isNaN(Number(paidAmount))) {
-      const amount = Number(paidAmount);
+    // Empty pays the full remaining balance; anything typed must be a valid
+    // number — an unparseable one used to be dropped, paying the full balance.
+    const amountIn = parseAmountInput(paidAmount);
+    if (remaining > 0 && amountIn.invalid) {
+      Toast.show({ type: 'error', text1: 'Enter a valid amount, or leave it empty to pay it all' });
+      return;
+    }
+    if (remaining > 0 && !amountIn.empty) {
+      const amount = amountIn.value;
       if (amount <= 0 || amount > remaining) {
         Toast.show({ type: 'error', text1: `Amount must be between 1 and ${remaining}` });
         return;
@@ -712,7 +731,7 @@ function PayForm({ payslip, onClose, C }) {
           <Text style={[styles.fieldLabel, { color: C.muted }]}>AMOUNT</Text>
           <TextInput
             value={paidAmount}
-            onChangeText={(v) => setPaidAmount(v.replace(/[^0-9.]/g, ''))}
+            onChangeText={(v) => setPaidAmount((prev) => filterAmountInput(v, prev))}
             keyboardType="decimal-pad"
             placeholder={String(remaining)}
             placeholderTextColor={C.mutedSoft}

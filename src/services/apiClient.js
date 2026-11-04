@@ -1,11 +1,24 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { useTokenStore } from '../store/tokenStore';
+import { useUserStore } from '../store/userStore';
 import { BACKEND_URL } from '../config/env';
 import { clearSessionAndRedirect, getSessionGeneration } from './session';
+import { CLIENT_PLATFORM_HEADER, clientPlatformValue } from '../utils/clientPlatform';
+import { isPasswordChangeRequired, planRefusalMessage } from '../utils/authErrors';
+
+// Sent on EVERY request (login and refresh included): the backend refuses a
+// school whose plan does not include this platform (e.g. "Your school's plan
+// does not include the Android app"). Also used by the raw axios calls below
+// and in useAuth (logout), which bypass apiClient.
+export const platformHeaders = {
+  [CLIENT_PLATFORM_HEADER]: clientPlatformValue(Platform.OS),
+};
 
 const apiClient = axios.create({
   baseURL: BACKEND_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...platformHeaders },
 });
 
 apiClient.interceptors.request.use((c) => {
@@ -36,6 +49,42 @@ const staleSessionError = () => {
   return err;
 };
 
+// The school's plan no longer covers this dashboard/platform: retrying or
+// refreshing cannot help. Revoke the refresh token (logout skips the plan
+// gate), end the session like a dead one and say why on the sign-in screen.
+// Once per session generation, so a burst of refused requests signs out once.
+let planEndedGeneration = -1;
+function endSessionForPlan(message) {
+  const generation = getSessionGeneration();
+  if (planEndedGeneration === generation) return;
+  const { accessToken: at, refreshToken: rt } = useTokenStore.getState();
+  if (rt) {
+    axios
+      .post(
+        `${BACKEND_URL}/auth/logout`,
+        { refreshToken: rt },
+        { headers: { ...platformHeaders, ...(at ? { Authorization: `Bearer ${at}` } : {}) } },
+      )
+      .catch(() => {});
+  }
+  clearSessionAndRedirect();
+  // clearSession bumped the generation; remember the new one.
+  planEndedGeneration = getSessionGeneration();
+  Toast.show({
+    type: 'error',
+    text1: 'Signed out',
+    text2: message,
+    visibilityTime: 8000,
+  });
+}
+
+// The API refuses everything but change-password until the password is
+// changed: record it on the user so the app layout shows that screen.
+function flagPasswordChange() {
+  const { user, setUser } = useUserStore.getState();
+  if (user && !user.mustChangePassword) setUser({ ...user, mustChangePassword: true });
+}
+
 // One refresh in flight per session generation; concurrent 401s await the
 // same promise. A new generation (after logout/login) never joins an old one.
 let refreshPromise = null;
@@ -47,7 +96,7 @@ function refreshTokens() {
     const { refreshToken } = useTokenStore.getState();
     refreshGeneration = generation;
     const p = axios
-      .post(`${BACKEND_URL}/auth/refresh`, { refreshToken })
+      .post(`${BACKEND_URL}/auth/refresh`, { refreshToken }, { headers: platformHeaders })
       .then((res) => {
         // Logged out (or re-logged in) meanwhile: drop this result entirely so
         // a late response can't write tokens back into a cleared session.
@@ -77,6 +126,16 @@ apiClient.interceptors.response.use(
     const orig = error.config || {};
     const status = error.response?.status;
 
+    // 403 session-level refusals. Login shows its own error; logout must
+    // never loop back here.
+    const url = orig.url || '';
+    if (status === 403 && !isAuthEndpoint(url) && !url.includes('/auth/logout')) {
+      const planMessage = planRefusalMessage(error);
+      if (planMessage) endSessionForPlan(planMessage);
+      else if (isPasswordChangeRequired(error)) flagPasswordChange();
+      return Promise.reject(error);
+    }
+
     if (status !== 401 || orig._retry || isAuthEndpoint(orig.url)) {
       return Promise.reject(error);
     }
@@ -95,6 +154,12 @@ apiClient.interceptors.response.use(
       // Reject (never resolve null): every waiting caller gets a real error.
       if (refreshError?.isStaleSession || getSessionGeneration() !== generation) {
         // The session this request belonged to is already gone; nothing to do.
+        return Promise.reject(error);
+      }
+      // The plan dropped this dashboard/platform: say why on the way out.
+      const planMessage = planRefusalMessage(refreshError);
+      if (planMessage) {
+        endSessionForPlan(planMessage);
         return Promise.reject(error);
       }
       if (isSessionDead(refreshError)) {

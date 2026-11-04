@@ -54,10 +54,9 @@ export const PERIOD_PILL = {
   other: { bg: '#f3f4f6', fg: '#374151', label: 'Other' },
 };
 
-export function currentAcademicYear() {
-  const y = new Date().getFullYear();
-  return `${y}-${y + 1}`;
-}
+// The school's academic year (its own start month, else April) — one rule,
+// shared with every screen; see utils/academicYear.
+export { currentAcademicYear } from '../utils/academicYear';
 
 export function addMinutes(hhmm, minutes) {
   if (!hhmm) return '';

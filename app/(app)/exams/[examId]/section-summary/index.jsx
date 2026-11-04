@@ -17,6 +17,7 @@ import {
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 import { formatDate, titleCase } from '../../../../../src/constants/exam';
+import { sectionResultLabel } from '../../../../../src/utils/examResult';
 
 function Stat({ label, value, C }) {
   return (
@@ -49,6 +50,11 @@ export default function SectionSummaryPage() {
   });
 
   const students = summary?.students || [];
+  // With electives a student is scored out of their own total, which can be
+  // less than the exam's — say so under the header figure.
+  const hasOwnTotals = students.some(
+    (s) => s.totalMarks != null && Number(s.totalMarks) !== Number(summary?.totalMarks),
+  );
   const sectionMeta = sections.find((s) => s._id === sectionId);
 
   return (
@@ -142,7 +148,7 @@ export default function SectionSummaryPage() {
 
             <View style={styles.statsRow}>
               <Stat label="Type" value={titleCase(exam?.type)} C={C} />
-              <Stat label="Total" value={summary.totalMarks} C={C} />
+              <Stat label="Total marks" value={summary.totalMarks} C={C} />
               <Stat label="Students" value={students.length} C={C} />
               <Stat
                 label="Schedule"
@@ -150,6 +156,13 @@ export default function SectionSummaryPage() {
                 C={C}
               />
             </View>
+
+            {hasOwnTotals ? (
+              <Text style={[styles.metaText, { color: C.muted }]}>
+                Students who don’t take an elective are marked out of their own total (shown on
+                each row).
+              </Text>
+            ) : null}
 
             {students.map((s) => (
               <Pressable
@@ -180,7 +193,7 @@ export default function SectionSummaryPage() {
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
                   <Text style={[styles.totalText, { color: C.text }]}>
-                    {s.totalObtained} / {summary.totalMarks}
+                    {s.totalObtained} / {s.totalMarks ?? summary.totalMarks}
                   </Text>
                   <Text style={[styles.pctText, { color: C.muted }]}>{s.percentage}%</Text>
                   <View
@@ -197,7 +210,7 @@ export default function SectionSummaryPage() {
                         { color: s.isPassed ? '#166534' : '#991b1b' },
                       ]}
                     >
-                      {s.isPassed ? 'PASS' : `FAIL · ${s.failedCount ?? 0}`}
+                      {sectionResultLabel(s)}
                     </Text>
                   </View>
                 </View>
