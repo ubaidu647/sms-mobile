@@ -179,13 +179,11 @@ export default function Drawer({ open, onClose }) {
       >
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View style={styles.brand}>
-            <View style={styles.brandLogo}>
-              <Image
-                source={require('../../assets/logo.png')}
-                style={{ width: 28, height: 28 }}
-                resizeMode="contain"
-              />
-            </View>
+            <Image
+              source={require('../../assets/logo-light.png')}
+              style={styles.brandLogo}
+              resizeMode="contain"
+            />
             <View style={{ flex: 1 }}>
               <Text style={styles.brandTitle}>Mizenzo</Text>
               <Text style={styles.brandSub}>School Management</Text>
@@ -294,14 +292,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.18)',
   },
-  brandLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  brandLogo: { width: 40, height: 40 },
   brandTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
   brandSub: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 2 },
   closeBtn: {
