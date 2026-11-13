@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -20,6 +19,7 @@ import {
   useUpdateExamSubject,
 } from '../../hooks/useExams';
 import { toYMD } from '../../constants/exam';
+import { clearableNumber } from '../../utils/clearableNumber';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -114,15 +114,23 @@ export default function ExamSubjectFormModal({
       passingMarks: Number(passingMarks),
     };
     if (!isEdit) payload.subjectId = subjectId;
-    if (startTime) payload.startTime = startTime;
-    if (endTime) payload.endTime = endTime;
-    if (theoryMarks !== '') payload.theoryMarks = Number(theoryMarks);
-    if (practicalMarks !== '') payload.practicalMarks = Number(practicalMarks);
+    if (isEdit) {
+      // Blank means clear on an edit: left out, the API keeps the old value.
+      payload.startTime = startTime || null;
+      payload.endTime = endTime || null;
+      payload.theoryMarks = clearableNumber(theoryMarks);
+      payload.practicalMarks = clearableNumber(practicalMarks);
+    } else {
+      if (startTime) payload.startTime = startTime;
+      if (endTime) payload.endTime = endTime;
+      if (theoryMarks !== '') payload.theoryMarks = Number(theoryMarks);
+      if (practicalMarks !== '') payload.practicalMarks = Number(practicalMarks);
+    }
     mut.mutate(payload);
   };
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -155,7 +163,6 @@ export default function ExamSubjectFormModal({
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -330,7 +337,7 @@ export default function ExamSubjectFormModal({
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

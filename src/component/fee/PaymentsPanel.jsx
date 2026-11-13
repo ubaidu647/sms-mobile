@@ -30,8 +30,10 @@ import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import SmallActionModal from './SmallActionModal';
 import PaymentDetailModal from './PaymentDetailModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 function PaymentCard({ p, canVoid, onVoid, onView, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const cfg = PAYMENT_METHOD_PILL[p.method] || PAYMENT_METHOD_PILL.other;
   return (
     <Pressable
@@ -64,7 +66,7 @@ function PaymentCard({ p, canVoid, onVoid, onView, C }) {
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[styles.amount, { color: p.isVoid ? '#991b1b' : C.text }]}>
-            {formatMoney(p.amount)}
+            {formatMoney(p.amount, currencySymbol)}
           </Text>
           <View style={[styles.pill, { backgroundColor: cfg.bg, marginTop: 4 }]}>
             <Text style={[styles.pillText, { color: cfg.fg }]}>{cfg.label}</Text>
@@ -100,6 +102,7 @@ function PaymentCard({ p, canVoid, onVoid, onView, C }) {
 }
 
 export default function PaymentsPanel() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { user } = useUserStore();
 
@@ -443,7 +446,7 @@ export default function PaymentsPanel() {
         title="Void Payment"
         subtitle={
           voidTarget
-            ? `Void receipt ${voidTarget.receiptNumber} (${formatMoney(voidTarget.amount)})?`
+            ? `Void receipt ${voidTarget.receiptNumber} (${formatMoney(voidTarget.amount, currencySymbol)})?`
             : ''
         }
         submitLabel="Void"

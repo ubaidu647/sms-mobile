@@ -31,6 +31,8 @@ import {
   hasAnyAction,
 } from '../../../../src/utils/permissions';
 import EditStaffModal from '../../../../src/component/EditStaffModal';
+import { useSchoolCurrency } from '../../../../src/hooks/useSchoolCurrency';
+import { formatMoney } from '../../../../src/utils/money';
 
 function InfoRow({ icon, label, value, sub, fallback = '—' }) {
   const C = useColors();
@@ -57,6 +59,7 @@ function Pill({ value, bg, fg, label }) {
 }
 
 export default function StaffDetailPage() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const router = useRouter();
   const { staffId } = useLocalSearchParams();
   const C = useColors();
@@ -116,7 +119,9 @@ export default function StaffDetailPage() {
     );
   }
 
-  if (error || !staff) {
+  // Only with nothing to show: a refetch that fails over a loaded record (opening
+  // Edit refetches it) must not replace this screen, and the modal on it.
+  if (!staff) {
     const msg =
       error?.response?.data?.message || error?.message || 'Staff not found';
     return (
@@ -269,7 +274,7 @@ export default function StaffDetailPage() {
           <InfoRow
             icon="dollar-sign"
             label="Salary"
-            value={staff.salary ? `PKR ${Number(staff.salary).toLocaleString()}` : null}
+            value={staff.salary ? formatMoney(staff.salary, currencySymbol) : null}
           />
           <InfoRow icon="calendar" label="Joining Date" value={fmtDate(staff.joiningDate)} />
           {!!staff.leavingDate && (

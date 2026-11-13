@@ -8,8 +8,9 @@ import { hasAnyAction, resolveScope } from '../../../src/utils/permissions';
 import VehiclesPanel from '../../../src/component/transport/VehiclesPanel';
 import RoutesPanel from '../../../src/component/transport/RoutesPanel';
 import AssignmentsPanel from '../../../src/component/transport/AssignmentsPanel';
+import PlanFeatureGate from '../../../src/component/PlanFeatureGate';
 
-export default function TransportScreen() {
+function TransportScreen() {
   const C = useColors();
   const { user } = useUserStore();
 
@@ -112,3 +113,12 @@ const styles = StyleSheet.create({
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
 });
+
+// The plan may not include this module: show "Upgrade required" instead.
+export default function TransportScreenRoute() {
+  return (
+    <PlanFeatureGate feature="transport">
+      <TransportScreen />
+    </PlanFeatureGate>
+  );
+}

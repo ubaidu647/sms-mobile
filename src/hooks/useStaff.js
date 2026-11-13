@@ -31,7 +31,7 @@ export function useStaffList({ page, limit, filters, branchId, enabled = true })
   });
 }
 
-export function useStaffDetail(staffId) {
+export function useStaffDetail(staffId, { staleTime = 60_000 } = {}) {
   return useQuery({
     queryKey: ['staff-detail', staffId],
     queryFn: async () => {
@@ -39,7 +39,7 @@ export function useStaffDetail(staffId) {
       return data;
     },
     enabled: !!staffId,
-    staleTime: 60_000,
+    staleTime,
   });
 }
 

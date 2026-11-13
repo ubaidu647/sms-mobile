@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -20,12 +19,17 @@ import { validateGraceDays, fmtMoney } from '../../constants/billing';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import { PASSWORD_MIN, PASSWORD_MAX } from '../../utils/changePassword';
+import { paymentDueFields } from '../../utils/paymentDue';
+import { useTranslations } from '../../i18n';
+import PaymentDueField from './PaymentDueField';
+import LaunchOfferSwitch, { launchOfferField } from './LaunchOfferSwitch';
 
 const STATUSES = ['active', 'pending', 'suspended'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function AddOrganizationModal({ open, onClose }) {
   const C = useColors();
+  const t = useTranslations('subscription');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,8 +37,11 @@ export default function AddOrganizationModal({ open, onClose }) {
   const [packageId, setPackageId] = useState('');
   const [status, setStatus] = useState('active');
   const [grace, setGrace] = useState('0');
+  const [blockUnpaid, setBlockUnpaid] = useState(true);
+  const [dueDays, setDueDays] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [applyOffer, setApplyOffer] = useState(true);
 
   const { data: pkgData, isLoading: pkgLoading } = usePackages({
     limit: 100,
@@ -42,6 +49,8 @@ export default function AddOrganizationModal({ open, onClose }) {
     enabled: open,
   });
   const packages = pkgData?.data ?? [];
+
+  const selected = packages.find((p) => p._id === packageId);
 
   const create = useCreateSchool({ onSuccess: () => onClose() });
 
@@ -53,8 +62,11 @@ export default function AddOrganizationModal({ open, onClose }) {
       setPackageId('');
       setStatus('active');
       setGrace('0');
+      setBlockUnpaid(true);
+      setDueDays('');
       setPassword('');
       setShowPw(false);
+      setApplyOffer(true);
     }
   }, [open]);
 
@@ -82,6 +94,8 @@ export default function AddOrganizationModal({ open, onClose }) {
       });
     const graceErr = validateGraceDays(grace);
     if (graceErr) return Toast.show({ type: 'error', text1: graceErr });
+    const due = paymentDueFields({ enabled: blockUnpaid, raw: dueDays });
+    if (due.error) return Toast.show({ type: 'error', text1: t('payment.errRange') });
 
     const payload = {
       name: name.trim(),
@@ -92,11 +106,12 @@ export default function AddOrganizationModal({ open, onClose }) {
     };
     if (password) payload.password = password;
     if (grace !== '' && grace != null) payload.gracePeriodInDays = Number(grace);
+    Object.assign(payload, due.fields, launchOfferField(selected, applyOffer));
     create.mutate(payload);
   };
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <View style={{ flex: 1 }}>
@@ -114,7 +129,7 @@ export default function AddOrganizationModal({ open, onClose }) {
           </Pressable>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }}>
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={styles.body}
@@ -186,6 +201,8 @@ export default function AddOrganizationModal({ open, onClose }) {
               )}
             </Field>
 
+            <LaunchOfferSwitch pkg={selected} value={applyOffer} onChange={setApplyOffer} C={C} />
+
             <Field label="Status *" C={C}>
               <View style={styles.chipRow}>
                 {STATUSES.map((s) => {
@@ -224,6 +241,14 @@ export default function AddOrganizationModal({ open, onClose }) {
               </Text>
             </Field>
 
+            <PaymentDueField
+              enabled={blockUnpaid}
+              onEnabledChange={setBlockUnpaid}
+              value={dueDays}
+              onChangeText={setDueDays}
+              C={C}
+            />
+
             <Field label="Password" C={C}>
               <View style={[styles.pwWrap, { borderColor: C.border, backgroundColor: C.bg }]}>
                 <TextInput
@@ -258,7 +283,7 @@ export default function AddOrganizationModal({ open, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

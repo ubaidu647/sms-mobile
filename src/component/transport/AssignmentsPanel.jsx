@@ -32,6 +32,7 @@ import {
 import { currentAcademicYear, formatMoney } from '../../constants/fee';
 import { hasAnyAction, resolveScope } from '../../utils/permissions';
 import AssignmentFormModal from './AssignmentFormModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const BLANK_FILTERS = (year) => ({
   routeId: '',
@@ -43,6 +44,7 @@ const BLANK_FILTERS = (year) => ({
 });
 
 export default function AssignmentsPanel() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { user } = useUserStore();
   const scope = resolveScope(user?.role, 'view-transport-assignment');
@@ -204,7 +206,7 @@ export default function AssignmentsPanel() {
         <View style={styles.row}>
           <Feather name="dollar-sign" size={11} color={C.mutedSoft} />
           <Text style={[styles.feeText, { color: COLORS.brand }]}>
-            {formatMoney(a.monthlyFee)}
+            {formatMoney(a.monthlyFee, currencySymbol)}
             <Text style={[styles.feeUnit, { color: C.mutedSoft }]}>{' / month'}</Text>
           </Text>
         </View>

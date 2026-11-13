@@ -7,6 +7,9 @@ import {
   changePackage,
   renewSubscription,
   cancelSubscription,
+  quoteAddon,
+  purchaseAddon,
+  removeAddon,
   listInvoices,
   getInvoiceSummary,
   getInvoiceBySubscription,
@@ -57,6 +60,40 @@ export const useChangePackage = (opts = {}) =>
 export const useRenewSubscription = (opts = {}) =>
   useSubscriptionMutation((p) => renewSubscription(p), 'Subscription renewed', opts.onSuccess);
 
+/* -------------------------------- Add-ons ------------------------------- */
+
+// Live price for the add-on form. `payload` is null until the form is valid;
+// callers debounce it so typing does not fire a request per keystroke.
+export const useAddonQuote = (payload) =>
+  useQuery({
+    queryKey: ['subscription', 'addonQuote', payload],
+    queryFn: () => quoteAddon(payload),
+    enabled: !!payload?.schoolId,
+    retry: false,
+  });
+
+export const usePurchaseAddon = (opts = {}) =>
+  useSubscriptionMutation((p) => purchaseAddon(p), 'Add-on added', opts.onSuccess);
+
+// No global error toast: callers show the server's message (e.g. "already paid").
+export const useRemoveAddon = (opts = {}) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (p) => removeAddon(p),
+    onSuccess: (res, vars) => {
+      Toast.show({ type: 'success', text1: res?.message || 'Add-on removed' });
+      const schoolId = vars?.schoolId;
+      if (schoolId) {
+        queryClient.invalidateQueries({ queryKey: ['subscription', 'current', schoolId] });
+        queryClient.invalidateQueries({ queryKey: ['subscription', 'history', schoolId] });
+        queryClient.invalidateQueries({ queryKey: ['invoice', 'list', schoolId] });
+        queryClient.invalidateQueries({ queryKey: ['invoice', 'summary', schoolId] });
+      }
+      opts.onSuccess?.(res?.data);
+    },
+  });
+};
+
 export const useCancelSubscription = (opts = {}) =>
   useSubscriptionMutation(
     (schoolId) => cancelSubscription(schoolId),
@@ -71,6 +108,15 @@ export const useInvoiceSummary = (schoolId) =>
     queryKey: ['invoice', 'summary', schoolId],
     queryFn: () => getInvoiceSummary(schoolId),
     enabled: !!schoolId,
+  });
+
+// Every invoice of a school (newest first, up to the server's page size) —
+// used to tell which add-ons are paid.
+export const useSchoolInvoices = (schoolId, { enabled = true } = {}) =>
+  useQuery({
+    queryKey: ['invoice', 'list', schoolId],
+    queryFn: () => listInvoices(schoolId),
+    enabled: !!schoolId && enabled,
   });
 
 export const useInvoiceBySubscription = (subscriptionId) =>
@@ -89,6 +135,9 @@ export const useMarkInvoicePaid = (schoolId, { onSuccess } = {}) => {
       if (schoolId) {
         queryClient.invalidateQueries({ queryKey: ['invoice', 'list', schoolId] });
         queryClient.invalidateQueries({ queryKey: ['invoice', 'summary', schoolId] });
+        // Paying clears the plan's payment due date (and lifts an `unpaid` block).
+        queryClient.invalidateQueries({ queryKey: ['subscription', 'current', schoolId] });
+        queryClient.invalidateQueries({ queryKey: ['subscription', 'history', schoolId] });
       }
       queryClient.invalidateQueries({ queryKey: ['invoice', 'subscription'] });
       onSuccess?.(res?.data);

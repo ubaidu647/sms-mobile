@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
-import { idempotencyHeaders } from '../utils/idempotency';
+import {
+  idempotencyHeaders,
+  isSpentKeyError,
+  paymentErrorMessage,
+  paymentSuccessMessage,
+} from '../utils/idempotency';
 
 // ────────────── Salary Structures ──────────────
 
@@ -282,9 +287,10 @@ export function useFinalizePayslip({ id, onSuccess } = {}) {
   });
 }
 
-export function usePayPayslip({ id, onSuccess } = {}) {
+export function usePayPayslip({ id, onSuccess, onError } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: ['pay-payslip', id],
     // `idempotencyKey` (one per opened pay form) travels as a header, not in the body
     mutationFn: async ({ idempotencyKey, ...payload }) => {
       const { data } = await apiClient.post(
@@ -299,12 +305,23 @@ export function usePayPayslip({ id, onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['payslip-summary'] });
       queryClient.invalidateQueries({ queryKey: ['payslip-history'] });
-      Toast.show({ type: 'success', text1: res?.message || 'Payslip marked paid' });
+      Toast.show({
+        type: 'success',
+        text1: paymentSuccessMessage(res?.message, 'Payslip marked paid'),
+      });
       onSuccess?.(res?.data);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to mark paid';
-      Toast.show({ type: 'error', text1: 'Failed', text2: msg });
+      if (isSpentKeyError(err)) {
+        queryClient.invalidateQueries({ queryKey: ['payslips'] });
+        queryClient.invalidateQueries({ queryKey: ['payslip-detail', id] });
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Failed',
+        text2: paymentErrorMessage(err, 'Failed to mark paid'),
+      });
+      onError?.(err);
     },
   });
 }
@@ -395,15 +412,17 @@ export function useUpsertSalaryPolicy({ onSuccess } = {}) {
 
 // ────────────── Helper: staff dropdown ──────────────
 
-export function useStaffDropdown({ branchId, enabled = true }) {
+// `isActive: 'false'` lists inactive staff instead (the API default is active).
+export function useStaffDropdown({ branchId, isActive, enabled = true }) {
   return useQuery({
-    queryKey: ['staff-dropdown-salary', branchId || ''],
+    queryKey: ['staff-dropdown-salary', branchId || '', isActive || ''],
     queryFn: () =>
       fetchData({
         url: '/staff/list',
         page: 1,
         limit: 500,
         branchId: branchId || undefined,
+        isActive: isActive || undefined,
       }),
     enabled,
     staleTime: 60_000,

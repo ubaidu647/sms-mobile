@@ -26,6 +26,7 @@ import {
 } from '../validation/classSchema';
 import { useColors } from '../theme/useColors';
 import { COLORS } from '../theme/colors';
+import { clearableNumber } from '../utils/clearableNumber';
 
 function Section({ title, children }) {
   const C = useColors();
@@ -148,7 +149,7 @@ export default function ClassForm({
             cls?.classTeacherInfo?._id ||
             '',
           totalCapacity: cls?.totalCapacity != null ? String(cls.totalCapacity) : '',
-          status: cls?.status || (cls?.isActive ? 'active' : 'inactive'),
+          status: cls?.isActive === false ? 'inactive' : 'active',
         };
 
   const {
@@ -217,6 +218,8 @@ export default function ClassForm({
     if (mode === 'edit' && (data.classTeacher === '' || data.classTeacher == null)) {
       payload.classTeacher = null;
     }
+    // Blank clears the capacity: left out, the API keeps the old value.
+    if (mode === 'edit') payload.totalCapacity = clearableNumber(data.totalCapacity);
     onSubmit(payload);
   };
 

@@ -28,8 +28,10 @@ import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import FeeStructureFormModal from './FeeStructureFormModal';
 import StructureDetailModal from './StructureDetailModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 function StructureCard({ s, canUpdate, canDelete, onEdit, onDelete, onView, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const totals = (s.components || []).reduce(
     (acc, c) => acc + (Number(c.amount) || 0),
     0,
@@ -74,9 +76,9 @@ function StructureCard({ s, canUpdate, canDelete, onEdit, onDelete, onView, C })
 
       <View style={[styles.statsRow, { borderTopColor: C.border }]}>
         <Stat label="Components" value={`${(s.components || []).length}`} C={C} />
-        <Stat label="Sum" value={formatMoney(totals)} C={C} />
+        <Stat label="Sum" value={formatMoney(totals, currencySymbol)} C={C} />
         <Stat label="Due Day" value={s.defaultDueDay ?? 10} C={C} />
-        <Stat label="Late/Day" value={formatMoney(s.lateFeePerDay ?? 0)} C={C} />
+        <Stat label="Late/Day" value={formatMoney(s.lateFeePerDay ?? 0, currencySymbol)} C={C} />
       </View>
 
       <View style={styles.compList}>
@@ -90,7 +92,7 @@ function StructureCard({ s, canUpdate, canDelete, onEdit, onDelete, onView, C })
               {titleCase(c.frequency)}
             </Text>
             <Text style={[styles.compAmount, { color: C.text }]}>
-              {formatMoney(c.amount)}
+              {formatMoney(c.amount, currencySymbol)}
             </Text>
           </View>
         ))}

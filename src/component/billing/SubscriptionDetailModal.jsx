@@ -4,18 +4,24 @@ import { Feather } from '@expo/vector-icons';
 import {
   fmtMoney,
   fmtDate,
-  effectiveLimit,
   graceCutoff,
   platformList,
   SUB_STATUS_PILL,
-  LIMIT_KEYS,
 } from '../../constants/billing';
 import { useColors } from '../../theme/useColors';
+import { describePlanFeatures } from '../../utils/planFeatures';
+import { isPaymentOverdue } from '../../utils/paymentDue';
+import { useTranslations } from '../../i18n';
+import { OverdueBadge, paymentWindowText } from './PaymentDueInfo';
+import AddonList from './AddonList';
+import LimitGrid from './LimitGrid';
+import { PriceLockBadge, priceLockText } from './PriceLock';
 
 // Read-only detail view for a single subscription row in the history list.
 // Mirrors web system/subscriptions/SubscriptionDetailModal.
 export default function SubscriptionDetailModal({ open, subscription, onClose }) {
   const C = useColors();
+  const t = useTranslations('subscription');
   const sub = subscription;
   const snap = sub?.packageSnapshot;
   const cfg = SUB_STATUS_PILL[sub?.status] || { bg: '#f3f4f6', fg: '#374151' };
@@ -65,10 +71,15 @@ export default function SubscriptionDetailModal({ open, subscription, onClose })
               <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
                 <Text style={[styles.pillText, { color: cfg.fg }]}>{sub.status || 'unknown'}</Text>
               </View>
+              {isPaymentOverdue(sub) && <OverdueBadge />}
+              <PriceLockBadge t={t} sub={sub} />
               <Text style={[styles.subtitle, { color: C.muted }]}>
                 {fmtMoney(snap?.price)} · {snap?.durationInDays}d cycle
               </Text>
             </View>
+            {!!sub.priceLock && (
+              <Text style={[styles.subtitle, { color: '#6d28d9' }]}>{priceLockText(t, sub)}</Text>
+            )}
 
             <View style={[styles.card, { backgroundColor: C.bg, borderColor: C.border }]}>
               <Row label="Start date" value={fmtDate(sub.startDate)} C={C} />
@@ -85,27 +96,28 @@ export default function SubscriptionDetailModal({ open, subscription, onClose })
                   C={C}
                 />
               )}
+              <Row label={t('payment.windowLabel')} value={paymentWindowText(t, sub)} C={C} />
+              {!!sub.paymentDueAt && (
+                <Row label={t('payment.dueOn')} value={fmtDate(sub.paymentDueAt)} C={C} />
+              )}
               <Row label="Created" value={fmtDate(sub.createdAt)} C={C} last />
             </View>
 
             <Text style={[styles.sectionTitle, { color: C.mutedSoft }]}>EFFECTIVE LIMITS</Text>
-            <View style={styles.limitGrid}>
-              {LIMIT_KEYS.map(([key, lbl]) => (
-                <View
-                  key={key}
-                  style={[styles.limitCard, { backgroundColor: C.bg, borderColor: C.border }]}
-                >
-                  <Text style={[styles.limitValue, { color: C.text }]}>
-                    {effectiveLimit(sub, key) ?? '∞'}
-                  </Text>
-                  <Text style={[styles.limitLabel, { color: C.muted }]}>{lbl}</Text>
-                </View>
-              ))}
-            </View>
+            <LimitGrid sub={sub} C={C} bordered />
             {sub.customLimits && Object.keys(sub.customLimits).length > 0 && (
               <Text style={[styles.hint, { color: '#92400e' }]}>
                 Custom limit overrides are applied to this school.
               </Text>
+            )}
+
+            {sub.addons?.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: C.mutedSoft }]}>
+                  {t('addons.title').toUpperCase()}
+                </Text>
+                <AddonList addons={sub.addons} C={C} />
+              </>
             )}
 
             <View style={[styles.card, { backgroundColor: C.bg, borderColor: C.border, padding: 14 }]}>
@@ -116,9 +128,9 @@ export default function SubscriptionDetailModal({ open, subscription, onClose })
                 </Text>
               </Text>
               <Text style={[styles.kv, { color: C.muted, marginTop: 8 }]}>
-                Features:{' '}
+                Modules:{' '}
                 <Text style={{ color: C.text }}>
-                  {snap?.features?.length ? snap.features.join(', ') : 'All features'}
+                  {describePlanFeatures(snap?.features)}
                 </Text>
               </Text>
             </View>
@@ -180,18 +192,6 @@ const styles = StyleSheet.create({
   card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
 
   sectionTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, paddingHorizontal: 2, marginTop: 4 },
-
-  limitGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  limitCard: {
-    flexBasis: '22%',
-    flexGrow: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  limitValue: { fontSize: 18, fontWeight: '800' },
-  limitLabel: { fontSize: 11, marginTop: 2 },
 
   hint: { fontSize: 12, fontWeight: '600', paddingHorizontal: 2 },
   kv: { fontSize: 13, fontWeight: '600' },

@@ -2,7 +2,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { filterAmountInput, parseAmountInput, payslipMonthError } from './payslipInput.js';
+import {
+  filterAmountInput,
+  instalmentAmount,
+  parseAmountInput,
+  payslipMonthError,
+} from './payslipInput.js';
 
 test('filterAmountInput keeps digits, one dot and two decimals', () => {
   assert.equal(filterAmountInput('5000'), '5000');
@@ -30,6 +35,31 @@ test('parseAmountInput: empty, valid and invalid', () => {
     const r = parseAmountInput(bad);
     assert.equal(r.invalid, true, bad);
     assert.equal(r.value, null, bad);
+  }
+});
+
+test('instalmentAmount: an empty field sends the full remaining balance', () => {
+  // Omitting it lets a held key replay an earlier instalment as a success.
+  assert.deepEqual(instalmentAmount('', 600), { invalid: false, amount: 600 });
+  assert.deepEqual(instalmentAmount('   ', 600), { invalid: false, amount: 600 });
+  assert.deepEqual(instalmentAmount(null, 600.5), { invalid: false, amount: 600.5 });
+});
+
+test('instalmentAmount: a typed amount is used as typed', () => {
+  assert.deepEqual(instalmentAmount('250.50', 600), { invalid: false, amount: 250.5 });
+  // Range is the caller's check, as before.
+  assert.deepEqual(instalmentAmount('0', 600), { invalid: false, amount: 0 });
+  assert.deepEqual(instalmentAmount('700', 600), { invalid: false, amount: 700 });
+});
+
+test('instalmentAmount: unparseable text is refused, never read as empty', () => {
+  assert.deepEqual(instalmentAmount('5..', 600), { invalid: true, amount: undefined });
+});
+
+test('instalmentAmount: nothing owed sends no amount, whatever is in the field', () => {
+  for (const remaining of [0, -5, undefined, null]) {
+    assert.deepEqual(instalmentAmount('', remaining), { invalid: false, amount: undefined });
+    assert.deepEqual(instalmentAmount('5..', remaining), { invalid: false, amount: undefined });
   }
 });
 

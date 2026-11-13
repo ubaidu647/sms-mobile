@@ -19,8 +19,15 @@ import PackageDetailModal from '../../../src/component/system/PackageDetailModal
 import ConfirmModal from '../../../src/component/system/ConfirmModal';
 import { useColors } from '../../../src/theme/useColors';
 import { COLORS } from '../../../src/theme/colors';
+import { PLAN_FEATURE_KEYS, enabledPlanFeatures } from '../../../src/utils/planFeatures';
 
 const PAGE_SIZE = 20;
+
+// Add-on modules the plan includes, e.g. "4/10"; empty/legacy lists = "All".
+const moduleCount = (features) => {
+  const enabled = enabledPlanFeatures(features);
+  return enabled === null ? 'All' : `${enabled.length}/${PLAN_FEATURE_KEYS.length}`;
+};
 
 const platformsOf = (p) =>
   Object.entries(p?.platforms || {})
@@ -52,7 +59,7 @@ function PackageCard({ p, onView, onEdit, onDeactivate, C }) {
         <Stat label="Students" value={p.limits?.noOfStudents ?? '-'} C={C} />
         <Stat label="Branches" value={p.limits?.noOfBranches ?? '-'} C={C} />
         <Stat label="Platforms" value={platforms.length ? platforms.length : 'None'} C={C} />
-        <Stat label="Features" value={p.features?.length ? p.features.length : 'All'} C={C} />
+        <Stat label="Modules" value={moduleCount(p.features)} C={C} />
       </View>
 
       <View style={styles.actionsRow}>

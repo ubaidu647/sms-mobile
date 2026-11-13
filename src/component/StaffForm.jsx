@@ -25,6 +25,11 @@ import {
   titleCase,
 } from '../constants/staff';
 import {
+  emptiedRequiredMessage,
+  nestedFormPatch,
+  scalarFormEntries,
+} from '../utils/scalarFormEntries';
+import {
   createStaffSchema,
   selfEditSchema,
   editStaffSchema,
@@ -32,6 +37,16 @@ import {
 import { useColors } from '../theme/useColors';
 import { COLORS } from '../theme/colors';
 import { PASSWORD_MIN } from '../utils/changePassword';
+import { useSchoolCurrency } from '../hooks/useSchoolCurrency';
+
+// The API refuses to clear these (PUT /staff/:id): emptied ones stop the save.
+const STAFF_REQUIRED_ON_EDIT = {
+  name: 'Name is required',
+  gender: 'Gender is required',
+  designation: 'Designation is required',
+  staffType: 'Staff type is required',
+  employmentType: 'Employment type is required',
+};
 
 function Section({ title, children }) {
   const C = useColors();
@@ -200,6 +215,7 @@ export default function StaffForm({
   isPending,
   submitLabel,
 }) {
+  const { code: currencyCode } = useSchoolCurrency();
   const C = useColors();
   const schema = isSelf
     ? selfEditSchema
@@ -314,6 +330,14 @@ export default function StaffForm({
   };
 
   const submit = (data) => {
+    if (mode === 'edit') {
+      const message = emptiedRequiredMessage(data, defaultValues, STAFF_REQUIRED_ON_EDIT);
+      if (message) {
+        Toast.show({ type: 'error', text1: 'Please fix the highlighted fields', text2: message });
+        return;
+      }
+    }
+
     const fd = new FormData();
 
     // Pick which scalar fields are allowed on this submit. Mirrors the web:
@@ -363,28 +387,25 @@ export default function StaffForm({
             'maritalStatus',
           ];
 
-    for (const k of scalarFields) {
-      const v = data[k];
-      if (v !== '' && v !== null && v !== undefined) fd.append(k, String(v));
-    }
+    const clearing =
+      mode === 'edit'
+        ? { initial: defaultValues, required: Object.keys(STAFF_REQUIRED_ON_EDIT) }
+        : {};
+    for (const [k, v] of scalarFormEntries(data, scalarFields, clearing)) fd.append(k, v);
 
     if (!isSelf) {
-      const address = {
-        street: data.street || '',
-        city: data.city || '',
-        state: data.state || '',
-      };
-      if (address.street || address.city || address.state) {
-        fd.append('address', JSON.stringify(address));
-      }
-      const emerg = {
-        name: data.emergencyName || '',
-        phone: data.emergencyPhone || '',
-        relation: data.emergencyRelation || '',
-      };
-      if (emerg.name || emerg.phone || emerg.relation) {
-        fd.append('emergencyContact', JSON.stringify(emerg));
-      }
+      const address = nestedFormPatch(
+        { street: 'street', city: 'city', state: 'state' },
+        data,
+        clearing,
+      );
+      if (address) fd.append('address', JSON.stringify(address));
+      const emerg = nestedFormPatch(
+        { name: 'emergencyName', phone: 'emergencyPhone', relation: 'emergencyRelation' },
+        data,
+        clearing,
+      );
+      if (emerg) fd.append('emergencyContact', JSON.stringify(emerg));
     }
 
     if (photo?.uri) {
@@ -555,8 +576,14 @@ export default function StaffForm({
         <Field label="Experience (years)">
           <TextFieldCtl control={control} name="experienceYears" placeholder="0" keyboardType="numeric" />
         </Field>
-        <Field label="Salary (PKR)">
-          <TextFieldCtl control={control} name="salary" placeholder="0" keyboardType="numeric" />
+        <Field label={`Salary (${currencyCode})`}>
+          {/* Blank on edit is no value or one this caller can't see, never a 0. */}
+          <TextFieldCtl
+            control={control}
+            name="salary"
+            placeholder={mode === 'create' ? '0' : ''}
+            keyboardType="numeric"
+          />
         </Field>
       </Section>
 

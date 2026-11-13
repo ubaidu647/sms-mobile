@@ -9,8 +9,9 @@ import DashboardPanel from '../../../src/component/staffSalary/DashboardPanel';
 import StructuresPanel from '../../../src/component/staffSalary/StructuresPanel';
 import PayslipsPanel from '../../../src/component/staffSalary/PayslipsPanel';
 import PolicyPanel from '../../../src/component/staffSalary/PolicyPanel';
+import PlanFeatureGate from '../../../src/component/PlanFeatureGate';
 
-export default function StaffSalaryScreen() {
+function StaffSalaryScreen() {
   const C = useColors();
   const { user } = useUserStore();
 
@@ -130,3 +131,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 });
+
+// The plan may not include this module: show "Upgrade required" instead.
+export default function StaffSalaryScreenRoute() {
+  return (
+    <PlanFeatureGate feature="staff-salary">
+      <StaffSalaryScreen />
+    </PlanFeatureGate>
+  );
+}

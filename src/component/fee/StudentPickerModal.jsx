@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -80,7 +79,6 @@ export default function StudentPickerModal({ open, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.body}>
             <Text style={[styles.label, { color: C.muted }]}>STUDENT *</Text>

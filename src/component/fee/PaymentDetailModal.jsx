@@ -20,10 +20,12 @@ import {
 } from '../../constants/fee';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 // Read-only receipt view for a single payment. Mirrors the web
 // PaymentDetailModal (without the print/PDF export, which needs web-only libs).
 export default function PaymentDetailModal({ open, payment, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const router = useRouter();
 
@@ -140,7 +142,7 @@ export default function PaymentDetailModal({ open, payment, onClose }) {
                     p.isVoid && styles.strike,
                   ]}
                 >
-                  {formatMoney(p.amount)}
+                  {formatMoney(p.amount, currencySymbol)}
                 </Text>
               </View>
             </View>
@@ -211,11 +213,11 @@ export default function PaymentDetailModal({ open, payment, onClose }) {
                   }
                   C={C}
                 />
-                <Row label="Total" value={formatMoney(voucher.totalAmount)} C={C} />
-                <Row label="Paid" value={formatMoney(voucher.paidAmount)} C={C} valueColor="#166534" />
+                <Row label="Total" value={formatMoney(voucher.totalAmount, currencySymbol)} C={C} />
+                <Row label="Paid" value={formatMoney(voucher.paidAmount, currencySymbol)} C={C} valueColor="#166534" />
                 <Row
                   label="Balance"
-                  value={formatMoney(voucher.balanceAmount)}
+                  value={formatMoney(voucher.balanceAmount, currencySymbol)}
                   valueColor={voucher.balanceAmount > 0 ? '#991b1b' : undefined}
                   C={C}
                   last={!statusCfg}

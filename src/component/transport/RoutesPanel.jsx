@@ -31,6 +31,7 @@ import { formatMoney } from '../../constants/fee';
 import RouteFormModal from './RouteFormModal';
 import RouteDetailModal from './RouteDetailModal';
 import RouteRosterModal from './RouteRosterModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const BLANK = {
   search: '',
@@ -41,6 +42,7 @@ const BLANK = {
 };
 
 export default function RoutesPanel() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { user } = useUserStore();
   const actions = user?.role?.actions || [];
@@ -174,7 +176,7 @@ export default function RoutesPanel() {
         <View style={styles.metaRow}>
           <Meta icon="truck" label={r.vehicleId?.registrationNumber || 'No vehicle'} C={C} />
           <Meta icon="map-pin" label={`${(r.stops || []).length} stops`} C={C} />
-          <Meta icon="dollar-sign" label={formatMoney(r.baseFee)} C={C} />
+          <Meta icon="dollar-sign" label={formatMoney(r.baseFee, currencySymbol)} C={C} />
           {r.branchId?.name ? <Meta icon="git-branch" label={r.branchId.name} C={C} /> : null}
         </View>
       </Pressable>

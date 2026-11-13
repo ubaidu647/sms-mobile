@@ -13,11 +13,13 @@ import { useFeeStructureDetail } from '../../hooks/useFees';
 import { MONTH_OPTIONS, formatMoney, titleCase } from '../../constants/fee';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const monthLabel = (m) => MONTH_OPTIONS.find((x) => x.value === Number(m))?.label || '—';
 
 // Read-only detail of a fee structure. Mirrors the web StructureDetailModal.
 export default function StructureDetailModal({ open, structure, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
 
   const id = structure?._id;
@@ -83,7 +85,7 @@ export default function StructureDetailModal({ open, structure, onClose }) {
                 <Info label="Year" value={s.academicYear} C={C} />
                 <Info label="Status" value={s.isActive ? 'Active' : 'Inactive'} C={C} />
                 <Info label="Default Due Day" value={s.defaultDueDay ?? '—'} C={C} />
-                <Info label="Late Fee / Day" value={formatMoney(s.lateFeePerDay)} C={C} />
+                <Info label="Late Fee / Day" value={formatMoney(s.lateFeePerDay, currencySymbol)} C={C} />
                 <Info label="Serial #" value={s.serialNumber || '—'} C={C} />
               </View>
             </View>
@@ -107,7 +109,7 @@ export default function StructureDetailModal({ open, structure, onClose }) {
                       {c.name}
                     </Text>
                     <Text style={[styles.compAmount, { color: C.text }]}>
-                      {formatMoney(c.amount)}
+                      {formatMoney(c.amount, currencySymbol)}
                     </Text>
                   </View>
                   <View style={styles.tagRow}>

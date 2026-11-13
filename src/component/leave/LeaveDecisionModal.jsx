@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { formatLeaveRange, titleCase } from '../../utils/leave';
@@ -62,10 +61,9 @@ export default function LeaveDecisionModal({ action, req, pending, onClose, onSu
   };
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <ToastModal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -127,7 +125,7 @@ export default function LeaveDecisionModal({ action, req, pending, onClose, onSu
           </View>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </ToastModal>
   );
 }
 
@@ -136,9 +134,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
   },
-  sheet: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },
+  // Vertical space is a margin: the keyboard view sets its own paddingBottom.
+  sheet: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 8, marginVertical: 20 },
   title: { fontSize: 17, fontWeight: '800' },
   sub: { fontSize: 12 },
   hint: { fontSize: 11 },

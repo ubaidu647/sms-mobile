@@ -202,7 +202,7 @@ export default function FreeTeachersPanel() {
           </View>
 
           {teachers.map((t) => {
-            const name = t.user?.name || '?';
+            const name = t.name || t.user?.name || '?';
             const initials =
               name
                 .split(' ')

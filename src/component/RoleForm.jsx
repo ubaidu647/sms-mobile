@@ -17,6 +17,8 @@ import {
   AVAILABLE_MENUS,
   PRESETS,
 } from '../constants/rolePermissions';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import { filterActionsByPlan, filterMenusByPlan } from '../utils/planFeatures';
 
 const initialForm = { name: '', branchId: '', menus: [], actions: [] };
 
@@ -46,21 +48,32 @@ export default function RoleForm({
   });
   const branches = branchesData?.data || [];
 
+  // Menus/actions of a module the school's plan lacks are never offered. A
+  // role being edited that already holds some keeps them: they stay in
+  // `form` (seeded from the role) and are saved untouched, just not shown.
+  const { features } = usePlanFeatures();
+
   // For non-admins, only menus/actions they already have can be granted.
   const allowedMenus = useMemo(
     () =>
-      canChangeBranch
-        ? AVAILABLE_MENUS
-        : AVAILABLE_MENUS.filter((m) => user?.role?.menus?.includes(m.key)),
-    [canChangeBranch, user?.role?.menus],
+      filterMenusByPlan(
+        canChangeBranch
+          ? AVAILABLE_MENUS
+          : AVAILABLE_MENUS.filter((m) => user?.role?.menus?.includes(m.key)),
+        features,
+      ),
+    [canChangeBranch, user?.role?.menus, features],
   );
 
   const allowedActions = useMemo(
     () =>
-      canChangeBranch
-        ? AVAILABLE_ACTIONS
-        : AVAILABLE_ACTIONS.filter((a) => user?.role?.actions?.includes(a.key)),
-    [canChangeBranch, user?.role?.actions],
+      filterActionsByPlan(
+        canChangeBranch
+          ? AVAILABLE_ACTIONS
+          : AVAILABLE_ACTIONS.filter((a) => user?.role?.actions?.includes(a.key)),
+        features,
+      ),
+    [canChangeBranch, user?.role?.actions, features],
   );
 
   const [form, setForm] = useState(initialForm);

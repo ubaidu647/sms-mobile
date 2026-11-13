@@ -1,17 +1,18 @@
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useInvoiceBySubscription, useMarkInvoicePaid } from '../../hooks/useSubscriptions';
-import { fmtMoney, fmtDate, INVOICE_STATUS_PILL } from '../../constants/billing';
+import { fmtMoney, fmtDate, INVOICE_STATUS_PILL, invoiceTypeLabel } from '../../constants/billing';
+import { useTranslations } from '../../i18n';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
-
-const titleCase = (s) => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '');
 
 // Invoice tied to a single subscription. Super-admin can mark an unpaid one paid.
 // Mirrors web subscriptions/InvoiceModal.
 export default function InvoiceModal({ open, subscription, schoolId, onClose }) {
   const C = useColors();
+  const t = useTranslations('subscription');
   const subscriptionId = subscription?._id;
   const { data, isLoading, isError, error } = useInvoiceBySubscription(open ? subscriptionId : null);
   const invoice = data?.data ?? null;
@@ -19,7 +20,7 @@ export default function InvoiceModal({ open, subscription, schoolId, onClose }) 
   const cfg = INVOICE_STATUS_PILL[invoice?.status] || { bg: '#f3f4f6', fg: '#374151' };
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <View style={{ flex: 1 }}>
@@ -56,7 +57,7 @@ export default function InvoiceModal({ open, subscription, schoolId, onClose }) 
                   <Text style={[styles.pillText, { color: cfg.fg }]}>{invoice.status || 'unknown'}</Text>
                 </View>
                 <Text style={[styles.subtitle, { color: C.muted }]}>
-                  {titleCase(invoice.type)} · {fmtDate(invoice.createdAt)}
+                  {invoiceTypeLabel(invoice.type, t('addons.invoiceType'))} · {fmtDate(invoice.createdAt)}
                 </Text>
               </View>
 
@@ -122,7 +123,7 @@ export default function InvoiceModal({ open, subscription, schoolId, onClose }) 
           </>
         )}
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

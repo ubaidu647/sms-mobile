@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../../../../../src/component/KeyboardAvoidingView';
+import ToastModal from '../../../../../src/component/ToastModal';
+import PaymentAccountPicker from '../../../../../src/component/PaymentAccountPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -22,7 +22,7 @@ import {
 import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
-import { canActOnBranch } from '../../../../../src/utils/permissions';
+import { canActOnBranch, refId } from '../../../../../src/utils/permissions';
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -33,30 +33,35 @@ import {
   formatMonth,
   todayYMD,
 } from '../../../../../src/constants/fee';
-import { newIdempotencyKey } from '../../../../../src/utils/idempotency';
+import { nextPaymentKey, paymentKeyFor } from '../../../../../src/utils/idempotency';
+import { useSchoolCurrency } from '../../../../../src/hooks/useSchoolCurrency';
 
-function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
+function PayConsolidatedModal({ open, studentId, branchId, outstanding, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
 
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(todayYMD());
   const [method, setMethod] = useState('cash');
+  const [ledgerAccountId, setLedgerAccountId] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
-  // One key per payment attempt: minted on open and again after every recorded
-  // payment, reused only for retries of the same unsubmitted attempt so a
-  // resubmit after a lost response can't double-record.
+  // One key per payment attempt, reused for retries and across a reopen while
+  // the outcome is unknown, so a resubmit after a lost response can't
+  // double-record. See nextPaymentKey.
   const idempotencyKeyRef = useRef(null);
+  const keyTarget = `student:${studentId}`;
 
   // Reset on the open transition only: every open starts from the current
   // outstanding with a blank reference, and an outstanding refetch while open
   // neither wipes the form nor mints a new key.
   useEffect(() => {
     if (!open) return;
-    idempotencyKeyRef.current = newIdempotencyKey();
+    idempotencyKeyRef.current = paymentKeyFor(keyTarget);
     setAmount(outstanding > 0 ? String(outstanding) : '');
     setPaymentDate(todayYMD());
     setMethod('cash');
+    setLedgerAccountId('');
     setReferenceNumber('');
     setNotes('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,10 +70,19 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
   const pay = useRecordConsolidatedPayment({
     onSuccess: () => {
       // This attempt is recorded; the next payment must not replay it.
-      idempotencyKeyRef.current = newIdempotencyKey();
+      idempotencyKeyRef.current = nextPaymentKey(keyTarget, idempotencyKeyRef.current);
       onClose();
     },
+    onError: (err) => {
+      idempotencyKeyRef.current = nextPaymentKey(keyTarget, idempotencyKeyRef.current, err);
+    },
   });
+
+  // Closing mid-request is refused: the key is only held once the request fails,
+  // so reopening before then would mint a new one and could record it twice.
+  const close = () => {
+    if (!pay.isPending) onClose();
+  };
 
   const refRequired = REFERENCE_REQUIRED_METHODS.includes(method);
 
@@ -82,7 +96,7 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
       Toast.show({
         type: 'error',
         text1: 'Exceeds outstanding',
-        text2: formatMoney(outstanding),
+        text2: formatMoney(outstanding, currencySymbol),
       });
       return;
     }
@@ -91,18 +105,18 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
       return;
     }
     const payload = { studentId, amount: num, paymentDate, method };
+    if (ledgerAccountId) payload.ledgerAccountId = ledgerAccountId;
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();
     if (notes.trim()) payload.notes = notes.trim();
     pay.mutate({ ...payload, idempotencyKey: idempotencyKeyRef.current });
   };
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <ToastModal visible={open} transparent animationType="fade" onRequestClose={close}>
       <KeyboardAvoidingView
         style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
           <View style={[styles.modalSheet, { backgroundColor: C.card }]}>
             <View style={styles.modalHeader}>
@@ -113,7 +127,7 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
                 </Text>
               </View>
               <Pressable
-                onPress={onClose}
+                onPress={close}
                 hitSlop={10}
                 style={({ pressed }) => [
                   styles.closeBtn,
@@ -129,7 +143,7 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
               style={[styles.balanceCard, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}
             >
               <Text style={styles.balanceLabel}>OUTSTANDING</Text>
-              <Text style={styles.balanceValue}>{formatMoney(outstanding)}</Text>
+              <Text style={styles.balanceValue}>{formatMoney(outstanding, currencySymbol)}</Text>
             </View>
 
             <View style={styles.row2}>
@@ -195,6 +209,14 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
               </View>
             </View>
 
+            <PaymentAccountPicker
+              branchId={branchId}
+              method={method}
+              value={ledgerAccountId}
+              onChange={setLedgerAccountId}
+              disabled={pay.isPending}
+            />
+
             <View>
               <Text style={[styles.label, { color: C.muted }]}>
                 REFERENCE
@@ -254,11 +276,12 @@ function PayConsolidatedModal({ open, studentId, outstanding, onClose }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </Modal>
+    </ToastModal>
   );
 }
 
 export default function ConsolidatedPage() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const { studentId } = useLocalSearchParams();
   const router = useRouter();
   const C = useColors();
@@ -352,11 +375,11 @@ export default function ConsolidatedPage() {
 
         {/* Totals */}
         <View style={styles.statsGrid}>
-          <Stat label="Total" value={formatMoney(totals.grandTotal ?? 0)} C={C} />
-          <Stat label="Paid" value={formatMoney(totals.paidTotal ?? 0)} color="#166534" C={C} />
+          <Stat label="Total" value={formatMoney(totals.grossTotal ?? 0, currencySymbol)} C={C} />
+          <Stat label="Paid" value={formatMoney(totals.totalPaid ?? 0, currencySymbol)} color="#166534" C={C} />
           <Stat
             label="Outstanding"
-            value={formatMoney(outstanding)}
+            value={formatMoney(outstanding, currencySymbol)}
             color={outstanding > 0 ? '#991b1b' : C.text}
             C={C}
           />
@@ -403,7 +426,7 @@ export default function ConsolidatedPage() {
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     <Text style={[styles.voucherTotal, { color: C.text }]}>
-                      {formatMoney(v.balanceAmount)}
+                      {formatMoney(v.balanceAmount, currencySymbol)}
                     </Text>
                     <View style={[styles.pill, { backgroundColor: cfg.bg }]}>
                       <Text style={[styles.pillText, { color: cfg.fg }]}>{cfg.label}</Text>
@@ -419,6 +442,7 @@ export default function ConsolidatedPage() {
       <PayConsolidatedModal
         open={payOpen}
         studentId={studentId}
+        branchId={refId(student?.branch)}
         outstanding={outstanding}
         onClose={() => setPayOpen(false)}
       />

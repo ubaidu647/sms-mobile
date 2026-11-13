@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView, { useScreenKeyboardOffset } from '../../src/component/KeyboardAvoidingView';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '../../src/theme/useColors';
 import { COLORS } from '../../src/theme/colors';
@@ -30,6 +29,7 @@ const FIELDS = [
 ];
 
 export default function ChangePasswordScreen() {
+  const keyboardOffset = useScreenKeyboardOffset();
   const C = useColors();
   const [values, setValues] = useState({
     currentPassword: '',
@@ -65,8 +65,8 @@ export default function ChangePasswordScreen() {
 
   return (
     <KeyboardAvoidingView
+      keyboardVerticalOffset={keyboardOffset}
       style={[styles.root, { backgroundColor: C.bg }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {forced ? (

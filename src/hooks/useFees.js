@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { fetchData } from '../services/api';
-import { idempotencyHeaders } from '../utils/idempotency';
+import { idempotencyHeaders, isSpentKeyError, paymentErrorMessage } from '../utils/idempotency';
 import {
   apiErrorMessage,
   normalizeSectionResult,
@@ -309,7 +309,7 @@ export function usePaymentDetail({ id, enabled = true }) {
   });
 }
 
-export function useRecordPayment({ onSuccess } = {}) {
+export function useRecordPayment({ onSuccess, onError } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     // `idempotencyKey` (one per opened payment form) travels as a header, not in the body
@@ -332,8 +332,9 @@ export function useRecordPayment({ onSuccess } = {}) {
       onSuccess?.(res?.data);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed';
-      Toast.show({ type: 'error', text1: 'Payment failed', text2: msg });
+      if (isSpentKeyError(err)) invalidateFeeQueries(queryClient);
+      Toast.show({ type: 'error', text1: 'Payment failed', text2: paymentErrorMessage(err) });
+      onError?.(err);
     },
   });
 }
@@ -371,7 +372,7 @@ export function useConsolidatedView({ studentId, enabled = true }) {
   });
 }
 
-export function useRecordConsolidatedPayment({ onSuccess } = {}) {
+export function useRecordConsolidatedPayment({ onSuccess, onError } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ idempotencyKey, ...payload }) => {
@@ -388,8 +389,9 @@ export function useRecordConsolidatedPayment({ onSuccess } = {}) {
       onSuccess?.(res?.data);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed';
-      Toast.show({ type: 'error', text1: 'Payment failed', text2: msg });
+      if (isSpentKeyError(err)) invalidateFeeQueries(queryClient);
+      Toast.show({ type: 'error', text1: 'Payment failed', text2: paymentErrorMessage(err) });
+      onError?.(err);
     },
   });
 }

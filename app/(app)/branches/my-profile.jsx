@@ -1,13 +1,12 @@
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import KeyboardAvoidingView, { useScreenKeyboardOffset } from '../../../src/component/KeyboardAvoidingView';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMyBranchProfile } from '../../../src/hooks/useMyBranchProfile';
@@ -17,6 +16,7 @@ import { COLORS } from '../../../src/theme/colors';
 import { useColors } from '../../../src/theme/useColors';
 
 export default function MyBranchProfilePage() {
+  const keyboardOffset = useScreenKeyboardOffset();
   const router = useRouter();
   const { user } = useUserStore();
   const C = useColors();
@@ -81,8 +81,8 @@ export default function MyBranchProfilePage() {
       </View>
 
       <KeyboardAvoidingView
+        keyboardVerticalOffset={keyboardOffset}
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.body}

@@ -62,6 +62,9 @@ function ToastShell({ type, text1, text2, onClose }) {
   );
 }
 
+// Shared by the root <Toast> and the ones inside modals (ToastModal).
+export const toastDefaults = { topOffset: 60, visibilityTime: 3000 };
+
 export const toastConfig = {
   success: ({ text1, text2, hide }) => (
     <ToastShell type="success" text1={text1} text2={text2} onClose={hide} />

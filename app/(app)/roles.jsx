@@ -24,6 +24,12 @@ import {
 import AddRoleModal from '../../src/component/AddRoleModal';
 import EditRoleModal from '../../src/component/EditRoleModal';
 import RoleActionsSheet from '../../src/component/RoleActionsSheet';
+import { usePlanFeatures } from '../../src/hooks/usePlanFeatures';
+import {
+  featureForMenu,
+  filterActionsByPlan,
+  filterMenusByPlan,
+} from '../../src/utils/planFeatures';
 
 const MENU_LABELS = Object.fromEntries(AVAILABLE_MENUS.map((m) => [m.key, m.label]));
 const ACTION_LABELS = Object.fromEntries(AVAILABLE_ACTIONS.map((a) => [a.key, a.label]));
@@ -115,7 +121,9 @@ function MultiChips({ values, options, onChange, C }) {
   );
 }
 
-function RoleCard({ item, onTap, onMenu, C }) {
+function RoleCard({ item, onTap, onMenu, isEnabled, C }) {
+  // Menus of modules the plan lacks are not shown (the role keeps them).
+  const menus = (item.menus || []).filter((m) => isEnabled(featureForMenu(m)));
   const isPredefined = !!item.isPredefined;
   return (
     <Pressable
@@ -185,18 +193,18 @@ function RoleCard({ item, onTap, onMenu, C }) {
         </View>
       </View>
 
-      {item.menus?.length > 0 && (
+      {menus.length > 0 && (
         <View style={[styles.menuList, { borderTopColor: C.border }]}>
           <Text style={[styles.menuListLabel, { color: C.mutedSoft }]}>MENUS</Text>
           <View style={styles.chipWrap}>
-            {item.menus.slice(0, 6).map((m) => (
+            {menus.slice(0, 6).map((m) => (
               <View key={m} style={styles.menuTag}>
                 <Text style={styles.menuTagText}>{MENU_LABELS[m] || m}</Text>
               </View>
             ))}
-            {item.menus.length > 6 && (
+            {menus.length > 6 && (
               <View style={styles.menuTagMuted}>
-                <Text style={styles.menuTagMutedText}>+{item.menus.length - 6} more</Text>
+                <Text style={styles.menuTagMutedText}>+{menus.length - 6} more</Text>
               </View>
             )}
           </View>
@@ -210,6 +218,12 @@ export default function RolesScreen() {
   const router = useRouter();
   const C = useColors();
   const { user } = useUserStore();
+  const { features, isEnabled } = usePlanFeatures();
+  const menuOptions = useMemo(() => filterMenusByPlan(AVAILABLE_MENUS, features), [features]);
+  const actionOptions = useMemo(
+    () => filterActionsByPlan(AVAILABLE_ACTIONS, features),
+    [features],
+  );
 
   const hasOrgAccess =
     !!user?.role?.isPredefined ||
@@ -412,7 +426,7 @@ export default function RolesScreen() {
           <Text style={[styles.filterLabel, { color: C.muted }]}>Menus</Text>
           <MultiChips
             values={draftMenus}
-            options={AVAILABLE_MENUS}
+            options={menuOptions}
             onChange={setDraftMenus}
             C={C}
           />
@@ -420,7 +434,7 @@ export default function RolesScreen() {
           <Text style={[styles.filterLabel, { color: C.muted }]}>Actions</Text>
           <MultiChips
             values={draftActions}
-            options={AVAILABLE_ACTIONS.map((a) => ({
+            options={actionOptions.map((a) => ({
               key: a.key,
               label: `${ACTION_LABELS[a.key] || a.key} · ${MENU_LABELS[a.menu] || a.menu}`,
             }))}
@@ -513,6 +527,7 @@ export default function RolesScreen() {
             item={item}
             onTap={() => openDetail(item)}
             onMenu={() => openMenu(item)}
+            isEnabled={isEnabled}
             C={C}
           />
         )}

@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -26,10 +25,13 @@ import {
   parseAmountInput,
   payslipMonthError,
 } from '../../utils/payslipInput';
+import { leaverTag, payslipListMonth, payslipStaffOptions } from '../../utils/payslipDisplay';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 export default function GeneratePayslipModal({ open, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { user } = useUserStore();
 
@@ -44,6 +46,8 @@ export default function GeneratePayslipModal({ open, onClose }) {
 
   const [staffId, setStaffId] = useState('');
   const [month, setMonth] = useState(previousMonth());
+  // The last complete month typed — the staff list follows it, not each keystroke.
+  const [listMonth, setListMonth] = useState(previousMonth());
   const [bonus, setBonus] = useState('');
   const [tax, setTax] = useState('');
   const [notes, setNotes] = useState('');
@@ -52,16 +56,36 @@ export default function GeneratePayslipModal({ open, onClose }) {
     if (!open) return;
     setStaffId('');
     setMonth(previousMonth());
+    setListMonth(previousMonth());
     setBonus('');
     setTax('');
     setNotes('');
   }, [open]);
 
-  const { data: staffData } = useStaffDropdown({
+  useEffect(() => {
+    setListMonth((prev) => payslipListMonth(month, prev));
+  }, [month]);
+
+  const { data: staffData, error: staffError } = useStaffDropdown({
     branchId: canAllBranch ? undefined : userBranchId,
     enabled: open,
   });
-  const staffList = useMemo(() => staffData?.data || [], [staffData]);
+  // Leavers are owed the months up to the one they left in, so inactive staff
+  // with a leaving date on or after the month are offered too.
+  const { data: leaverData, error: leaverError } = useStaffDropdown({
+    branchId: canAllBranch ? undefined : userBranchId,
+    isActive: 'false',
+    enabled: open,
+  });
+  const staffList = useMemo(
+    () => payslipStaffOptions(staffData?.data, leaverData?.data, listMonth),
+    [staffData, leaverData, listMonth],
+  );
+
+  // A leaver picked for one month may not be owed a later one.
+  useEffect(() => {
+    if (staffId && staffData && !staffList.some((s) => s._id === staffId)) setStaffId('');
+  }, [staffId, staffData, staffList]);
 
   const { data: activeStruct, isFetching: structLoading } = useActiveStructure({
     staffId,
@@ -70,6 +94,12 @@ export default function GeneratePayslipModal({ open, onClose }) {
   // The hook resolves to the structure or null (none active) — never the envelope.
   const struct = activeStruct || null;
   const noStruct = !!staffId && !structLoading && !struct;
+
+  // A failed lookup is not "no staff": say why, as the web form does.
+  const pickerError = staffError || leaverError;
+  const pickerErrorText = pickerError
+    ? pickerError?.response?.data?.message || pickerError?.message || 'Could not load the staff list'
+    : '';
 
   const gen = useGeneratePayslip({ onSuccess: () => onClose() });
 
@@ -101,7 +131,7 @@ export default function GeneratePayslipModal({ open, onClose }) {
   };
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <View style={{ flex: 1 }}>
@@ -121,7 +151,6 @@ export default function GeneratePayslipModal({ open, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -132,12 +161,13 @@ export default function GeneratePayslipModal({ open, onClose }) {
             <View>
               <Text style={[styles.label, { color: C.muted }]}>STAFF *</Text>
               {staffList.length === 0 ? (
-                <ActivityIndicator size="small" color={COLORS.brand} />
+                pickerErrorText ? null : <ActivityIndicator size="small" color={COLORS.brand} />
               ) : (
                 <View style={styles.chipRow}>
                   {staffList.map((s) => {
                     const active = staffId === s._id;
-                    const name = s.user?.name || s.userId?.name || s.name || '?';
+                    const left = leaverTag(s);
+                    const name = `${s.user?.name || s.userId?.name || s.name || '?'}${left ? ` (${left})` : ''}`;
                     return (
                       <Pressable
                         key={s._id}
@@ -164,6 +194,9 @@ export default function GeneratePayslipModal({ open, onClose }) {
                   })}
                 </View>
               )}
+              {!!pickerErrorText && (
+                <Text style={styles.pickerError}>{pickerErrorText}</Text>
+              )}
             </View>
 
             {staffId && (
@@ -181,7 +214,7 @@ export default function GeneratePayslipModal({ open, onClose }) {
                   <View style={styles.infoBox}>
                     <Feather name="info" size={14} color="#0f766e" />
                     <Text style={styles.infoText}>
-                      Basic: <Text style={{ fontWeight: '800' }}>{formatMoney(struct.basicSalary, struct.currency)}</Text>
+                      Basic: <Text style={{ fontWeight: '800' }}>{formatMoney(struct.basicSalary, currencySymbol)}</Text>
                       {' · '}Allowances: <Text style={{ fontWeight: '800' }}>{(struct.allowances || []).length}</Text>
                       {' · '}Deductions: <Text style={{ fontWeight: '800' }}>{(struct.deductions || []).length}</Text>
                     </Text>
@@ -263,7 +296,7 @@ export default function GeneratePayslipModal({ open, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 
@@ -323,6 +356,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   warnText: { color: '#92400e', fontSize: 12, flex: 1 },
+  pickerError: { color: '#dc2626', fontSize: 12, marginTop: 6 },
 
   infoBox: {
     flexDirection: 'row',

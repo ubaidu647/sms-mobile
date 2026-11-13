@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,27 +8,50 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { usePackages } from '../../hooks/usePackages';
-import { useChangePackage } from '../../hooks/useSubscriptions';
+import {
+  useChangePackage,
+  useInvoiceBySubscription,
+  useSchoolInvoices,
+} from '../../hooks/useSubscriptions';
 import { fmtMoney, validateGraceDays } from '../../constants/billing';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
-
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
+import { estimatePlanChange } from '../../utils/planChangeEstimate';
+import { addonsWithInvoices } from '../../utils/planAddons';
+import { initialBlockEnabled, paymentDueFields } from '../../utils/paymentDue';
+import { useTranslations } from '../../i18n';
+import PaymentDueField from './PaymentDueField';
+import LaunchOfferSwitch, { launchOfferField } from './LaunchOfferSwitch';
+import { startPrice } from '../../utils/launchOffer';
 
 export default function ChangePlanModal({ open, onClose, schoolId, schoolName, current }) {
   const C = useColors();
+  const t = useTranslations('subscription');
   const { data: pkgData } = usePackages({ limit: 100, filters: { isActive: true }, enabled: open });
   const packages = pkgData?.data ?? [];
   const change = useChangePackage({ onSuccess: () => onClose() });
+  const invoiceQuery = useInvoiceBySubscription(open ? current?._id : null);
+  // A package change drops the add-ons, crediting the paid ones' unused value.
+  const hasAddons = (current?.addons?.length ?? 0) > 0;
+  const addonInvoices = useSchoolInvoices(schoolId, { enabled: open && hasAddons });
+  const addonRows = useMemo(
+    () => addonsWithInvoices(current?.addons, addonInvoices.data?.data),
+    [current?.addons, addonInvoices.data],
+  );
 
   const [packageId, setPackageId] = useState('');
   const [method, setMethod] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [grace, setGrace] = useState('');
+  const [blockUnpaid, setBlockUnpaid] = useState(true);
+  const [dueDays, setDueDays] = useState('');
+  const [applyOffer, setApplyOffer] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -39,21 +59,28 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
       setMethod('');
       setTransactionId('');
       setGrace(current?.gracePeriodInDays != null ? String(current.gracePeriodInDays) : '');
+      setBlockUnpaid(initialBlockEnabled(current));
+      setDueDays('');
+      setApplyOffer(true);
     }
   }, [open, current]);
 
   const selected = packages.find((p) => p._id === packageId);
 
-  // Client-side proration preview; backend is authoritative.
+  // Client-side proration preview; backend is authoritative. Whether the current
+  // invoice was paid decides the credit, so no figure shows until that is known.
+  const invoiceKnown = invoiceQuery.isSuccess && (!hasAddons || addonInvoices.isSuccess);
+  const invoice = invoiceQuery.data?.data ?? null;
   const estimate = useMemo(() => {
-    const snap = current?.packageSnapshot;
-    if (!selected || !snap?.price || !snap?.durationInDays || !current?.endDate) return null;
-    const remainingDays = Math.max(0, (new Date(current.endDate) - new Date()) / MS_PER_DAY);
-    const credit = snap.price * (remainingDays / snap.durationInDays);
-    const amountDue = Math.max(0, selected.price - credit);
-    const direction = selected.price >= snap.price ? 'Upgrade' : 'Downgrade';
-    return { credit, amountDue, direction };
-  }, [selected, current]);
+    if (!selected || !invoiceKnown) return null;
+    // The launch-offer price when it applies (see LaunchOfferSwitch).
+    return estimatePlanChange({
+      current,
+      invoice,
+      newPrice: startPrice(selected, applyOffer),
+      addons: addonRows,
+    });
+  }, [selected, current, invoice, invoiceKnown, addonRows, applyOffer]);
 
   const submit = () => {
     if (!packageId) return Toast.show({ type: 'error', text1: 'Please choose the new package' });
@@ -61,17 +88,28 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
       return Toast.show({ type: 'error', text1: 'That is already the current plan. Use Renew instead.' });
     const graceErr = validateGraceDays(grace);
     if (graceErr) return Toast.show({ type: 'error', text1: graceErr });
+    const due = paymentDueFields({
+      enabled: blockUnpaid,
+      raw: dueDays,
+      carriedOff: current?.paymentDueInDays === null,
+    });
+    if (due.error)
+      return Toast.show({
+        type: 'error',
+        text1: t(due.error === 'required' ? 'payment.errRequired' : 'payment.errRange'),
+      });
 
     const payload = { schoolId, packageId };
     if (method || transactionId) {
       payload.paymentInfo = { method: method || undefined, transactionId: transactionId || undefined };
     }
     if (grace !== '' && grace != null) payload.gracePeriodInDays = Number(grace);
+    Object.assign(payload, due.fields, launchOfferField(selected, applyOffer));
     change.mutate(payload);
   };
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <View style={{ flex: 1 }}>
@@ -87,7 +125,7 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
           </Pressable>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {current?.packageSnapshot && (
               <View style={[styles.infoBox, { backgroundColor: C.bg, borderColor: C.border }]}>
@@ -96,6 +134,10 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
                   {' — '}{fmtMoney(current.packageSnapshot.price)} / {current.packageSnapshot.durationInDays}d
                 </Text>
               </View>
+            )}
+
+            {hasAddons && (
+              <Text style={[styles.infoText, { color: '#b45309' }]}>{t('addons.changeNote')}</Text>
             )}
 
             <Text style={[styles.label, { color: C.muted }]}>NEW PACKAGE *</Text>
@@ -125,17 +167,36 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
               </View>
             )}
 
+            <LaunchOfferSwitch pkg={selected} value={applyOffer} onChange={setApplyOffer} C={C} />
+
+            {selected && invoiceQuery.isError && (
+              <Text style={[styles.infoText, { color: C.mutedSoft }]}>
+                Could not load the current invoice, so no estimate is shown. The server calculates the final amount.
+              </Text>
+            )}
+
             {estimate && (
               <View style={[styles.estBox, { borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }]}>
                 <Text style={styles.estTitle}>Estimated billing ({estimate.direction})</Text>
                 <View style={styles.estRow}>
-                  <Text style={styles.estLabel}>Credit for unused time</Text>
+                  <Text style={styles.estLabel}>Credit</Text>
                   <Text style={styles.estLabel}>−{fmtMoney(estimate.credit)}</Text>
                 </View>
+                {estimate.carriedForward > 0 && (
+                  <View style={styles.estRow}>
+                    <Text style={styles.estLabel}>Carried to the new plan</Text>
+                    <Text style={styles.estLabel}>{fmtMoney(estimate.carriedForward)}</Text>
+                  </View>
+                )}
                 <View style={styles.estRow}>
                   <Text style={styles.estStrong}>Amount due</Text>
                   <Text style={styles.estStrong}>{fmtMoney(estimate.amountDue)}</Text>
                 </View>
+                {estimate.invoiceUnpaid && (
+                  <Text style={styles.estNote}>
+                    The current invoice is not paid, so its unused time earns no credit{invoice?.status === 'unpaid' ? ' and the invoice is voided' : ''}.
+                  </Text>
+                )}
                 <Text style={styles.estNote}>
                   Estimate only — a fresh {selected?.durationInDays}-day cycle starts on confirm. The server calculates the final amount.
                 </Text>
@@ -159,6 +220,16 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
               <Text style={[styles.infoText, { color: C.mutedSoft }]}>Leave unchanged to keep the current grace period.</Text>
             </View>
 
+            <PaymentDueField
+              enabled={blockUnpaid}
+              onEnabledChange={setBlockUnpaid}
+              value={dueDays}
+              onChangeText={setDueDays}
+              placeholder={current?.paymentDueInDays > 0 ? String(current.paymentDueInDays) : undefined}
+              canCarry
+              C={C}
+            />
+
             <Pressable onPress={submit} disabled={change.isPending} style={({ pressed }) => [styles.submit, (change.isPending || pressed) && { opacity: 0.85 }]}>
               {change.isPending ? <ActivityIndicator size="small" color="#fff" /> : (
                 <>
@@ -170,7 +241,7 @@ export default function ChangePlanModal({ open, onClose, schoolId, schoolName, c
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

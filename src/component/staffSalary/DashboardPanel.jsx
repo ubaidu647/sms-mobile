@@ -20,6 +20,7 @@ import {
 } from '../../constants/staffSalary';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 function KpiCard({ icon, label, value, sub, tone, C }) {
   const tones = {
@@ -61,6 +62,7 @@ function StatusTile({ status, count, icon }) {
 }
 
 export default function DashboardPanel() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { user } = useUserStore();
 
@@ -181,9 +183,9 @@ export default function DashboardPanel() {
       {effectiveBranchId && summary && (
         <>
           <View style={styles.kpiGrid}>
-            <KpiCard icon="briefcase" label="Gross" value={formatMoney(summary.totalGross || 0)} tone="teal" C={C} />
-            <KpiCard icon="trending-up" label="Net (sum)" value={formatMoney(summary.totalNet || 0)} tone="blue" C={C} />
-            <KpiCard icon="check-circle" label="Total Paid" value={formatMoney(summary.totalPaid || 0)} tone="green" C={C} />
+            <KpiCard icon="briefcase" label="Gross" value={formatMoney(summary.totalGross || 0, currencySymbol)} tone="teal" C={C} />
+            <KpiCard icon="trending-up" label="Net (sum)" value={formatMoney(summary.totalNet || 0, currencySymbol)} tone="blue" C={C} />
+            <KpiCard icon="check-circle" label="Total Paid" value={formatMoney(summary.totalPaid || 0, currencySymbol)} tone="green" C={C} />
             <KpiCard icon="file-text" label="Payslips" value={total} sub={formatMonth(month)} tone="amber" C={C} />
           </View>
 

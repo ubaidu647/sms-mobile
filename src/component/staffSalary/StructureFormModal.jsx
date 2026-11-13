@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -24,10 +23,13 @@ import { COMPONENT_TYPES, formatMoney, toYMD } from '../../constants/staffSalary
 import { componentTotal, round2 } from '../../utils/money';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const blank = () => ({ name: '', amount: '', type: 'fixed' });
 
 export default function StructureFormModal({ open, onClose, structure }) {
+  // Fixed to the school's currency: the API refuses any other.
+  const { code: currencyCode, symbol: currencySymbol } = useSchoolCurrency();
   const isEdit = !!structure;
   const C = useColors();
   const { user } = useUserStore();
@@ -43,7 +45,6 @@ export default function StructureFormModal({ open, onClose, structure }) {
 
   const [staffId, setStaffId] = useState('');
   const [basicSalary, setBasicSalary] = useState('');
-  const [currency, setCurrency] = useState('PKR');
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [effectiveTo, setEffectiveTo] = useState('');
   const [allowances, setAllowances] = useState([]);
@@ -61,7 +62,6 @@ export default function StructureFormModal({ open, onClose, structure }) {
     if (isEdit) {
       setStaffId(structure.staffId?._id || structure.staffId || '');
       setBasicSalary(structure.basicSalary != null ? String(structure.basicSalary) : '');
-      setCurrency(structure.currency || 'PKR');
       setEffectiveFrom(toYMD(structure.effectiveFrom));
       setEffectiveTo(toYMD(structure.effectiveTo));
       setAllowances(
@@ -82,7 +82,6 @@ export default function StructureFormModal({ open, onClose, structure }) {
     } else {
       setStaffId('');
       setBasicSalary('');
-      setCurrency('PKR');
       setEffectiveFrom('');
       setEffectiveTo('');
       setAllowances([]);
@@ -150,14 +149,19 @@ export default function StructureFormModal({ open, onClose, structure }) {
 
     const payload = {
       basicSalary: Number(basicSalary),
-      currency: currency || 'PKR',
       effectiveFrom,
       allowances: clean(allowances),
       deductions: clean(deductions),
     };
-    if (effectiveTo) payload.effectiveTo = effectiveTo;
-    if (notes?.trim()) payload.notes = notes.trim();
-    if (!isEdit) payload.staffId = staffId;
+    if (isEdit) {
+      // Blank means clear on an edit: left out, the API keeps the old value.
+      payload.effectiveTo = effectiveTo || null;
+      payload.notes = notes.trim();
+    } else {
+      if (effectiveTo) payload.effectiveTo = effectiveTo;
+      if (notes?.trim()) payload.notes = notes.trim();
+      payload.staffId = staffId;
+    }
 
     mut.mutate(payload);
   };
@@ -212,7 +216,7 @@ export default function StructureFormModal({ open, onClose, structure }) {
                   ]}
                 >
                   <Text style={[styles.typeBtnText, { color: active ? '#fff' : C.text }]}>
-                    {t === 'percent' ? '%' : 'PKR'}
+                    {t === 'percent' ? '%' : currencySymbol}
                   </Text>
                 </Pressable>
               );
@@ -242,7 +246,7 @@ export default function StructureFormModal({ open, onClose, structure }) {
   );
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <View style={{ flex: 1 }}>
@@ -266,7 +270,6 @@ export default function StructureFormModal({ open, onClose, structure }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -329,13 +332,12 @@ export default function StructureFormModal({ open, onClose, structure }) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.label, { color: C.muted }]}>CURRENCY</Text>
+                {/* The school's currency (Settings); the payload leaves it out so the API applies it. */}
                 <TextInput
-                  value={currency}
-                  onChangeText={(v) => setCurrency(v.toUpperCase().slice(0, 6))}
-                  placeholder="PKR"
-                  placeholderTextColor={C.mutedSoft}
-                  autoCapitalize="characters"
-                  style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
+                  value={currencySymbol === currencyCode ? currencyCode : `${currencyCode} (${currencySymbol})`}
+                  editable={false}
+                  accessibilityLabel={`Currency ${currencyCode}`}
+                  style={[styles.input, { color: C.muted, borderColor: C.border, backgroundColor: C.bg }]}
                 />
               </View>
             </View>
@@ -381,19 +383,19 @@ export default function StructureFormModal({ open, onClose, structure }) {
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>Total Allowances</Text>
                 <Text style={styles.totalsValue}>
-                  + {totals.totalAllowance.toLocaleString()}
+                  + {formatMoney(totals.totalAllowance, currencySymbol)}
                 </Text>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>Total Deductions</Text>
                 <Text style={styles.totalsValue}>
-                  − {totals.totalDeduction.toLocaleString()}
+                  − {formatMoney(totals.totalDeduction, currencySymbol)}
                 </Text>
               </View>
               <View style={[styles.totalsRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#99f6e4', paddingTop: 6 }]}>
                 <Text style={[styles.totalsLabel, { fontWeight: '800' }]}>Net (estimate)</Text>
                 <Text style={[styles.totalsValue, { color: '#0f766e', fontSize: 16 }]}>
-                  {formatMoney(totals.net, currency)}
+                  {formatMoney(totals.net, currencySymbol)}
                 </Text>
               </View>
             </View>
@@ -435,7 +437,7 @@ export default function StructureFormModal({ open, onClose, structure }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

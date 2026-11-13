@@ -13,6 +13,7 @@ import { useTeachingStaffDropdown } from '../hooks/useClasses';
 import { useClassesDropdown } from '../hooks/useSubjects';
 import { useColors } from '../theme/useColors';
 import { COLORS } from '../theme/colors';
+import { clearableNumber } from '../utils/clearableNumber';
 import {
   SUBJECT_CATEGORIES,
   SUBJECT_CODE_REGEX,
@@ -85,7 +86,7 @@ export default function SubjectForm({
         creditHours: subject.creditHours?.toString() ?? '',
         defaultTeacher:
           subject.defaultTeacher || subject.teacherInfo?._id || '',
-        status: subject.status || 'active',
+        status: subject.isActive === false ? 'inactive' : 'active',
       });
       setErrors({});
     } else if (mode === 'create') {
@@ -177,10 +178,10 @@ export default function SubjectForm({
       if (form.totalMarks !== '') payload.totalMarks = Number(form.totalMarks);
       if (form.passingMarks !== '')
         payload.passingMarks = Number(form.passingMarks);
-      if (form.theoryMarks !== '') payload.theoryMarks = Number(form.theoryMarks);
-      if (form.practicalMarks !== '')
-        payload.practicalMarks = Number(form.practicalMarks);
-      if (form.creditHours !== '') payload.creditHours = Number(form.creditHours);
+      // Blank clears these three: left out, the API keeps the old value.
+      payload.theoryMarks = clearableNumber(form.theoryMarks);
+      payload.practicalMarks = clearableNumber(form.practicalMarks);
+      payload.creditHours = clearableNumber(form.creditHours);
       // Allow clearing teacher with null
       payload.defaultTeacher = form.defaultTeacher || null;
       if (form.status) payload.status = form.status;

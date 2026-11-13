@@ -1,28 +1,68 @@
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from './KeyboardAvoidingView';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import StaffForm from './StaffForm';
-import { useUpdateStaff } from '../hooks/useStaff';
+import QueryErrorState from './QueryErrorState';
+import { useStaffDetail, useUpdateStaff } from '../hooks/useStaff';
 import { useColors } from '../theme/useColors';
+import { COLORS } from '../theme/colors';
+import { freshRecord } from '../utils/freshRecord';
 
-export default function EditStaffModal({ open, staff, isSelf, onClose }) {
-  const C = useColors();
+// Rendered inside the Modal, which unmounts its children on close: every open
+// gets a new query observer, and so its own refetch. Above the Modal it would
+// live as long as the detail screen does, and count as fetched after one load.
+function EditStaffContent({ staff, isSelf, onClose }) {
+  // `staff` may be a list row, which carries a few fields: the form must open
+  // from the full record, or saving would write its blanks over the real values.
+  // Fresh too: the form saves every field, isActive included, and a cached copy
+  // would undo a block made since.
+  const detail = useStaffDetail(staff._id, { staleTime: 0 });
+  const record = freshRecord(detail);
   const { mutate, isPending } = useUpdateStaff({
-    staffId: staff?._id,
+    staffId: staff._id,
     onSuccess: () => onClose(),
   });
 
+  if (record) {
+    return (
+      <StaffForm
+        mode="edit"
+        staff={record}
+        isSelf={isSelf}
+        canCreateAllBranch={false}
+        onSubmit={(fd) => mutate(fd)}
+        isPending={isPending}
+        submitLabel="Save Changes"
+      />
+    );
+  }
+  if (detail.isError && !detail.isFetching) {
+    return (
+      <QueryErrorState
+        error={detail.error}
+        fallback="Could not load this staff member"
+        onRetry={detail.refetch}
+        style={{ flex: 0 }}
+      />
+    );
+  }
+  return <ActivityIndicator size="large" color={COLORS.brand} style={{ marginTop: 40 }} />;
+}
+
+export default function EditStaffModal({ open, staff, isSelf, onClose }) {
+  const C = useColors();
+
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -53,7 +93,6 @@ export default function EditStaffModal({ open, staff, isSelf, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -61,21 +100,11 @@ export default function EditStaffModal({ open, staff, isSelf, onClose }) {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {!!staff && (
-              <StaffForm
-                mode="edit"
-                staff={staff}
-                isSelf={isSelf}
-                canCreateAllBranch={false}
-                onSubmit={(fd) => mutate(fd)}
-                isPending={isPending}
-                submitLabel="Save Changes"
-              />
-            )}
+            {staff ? <EditStaffContent staff={staff} isSelf={isSelf} onClose={onClose} /> : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

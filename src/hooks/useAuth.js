@@ -6,7 +6,11 @@ import { useTokenStore } from '../store/tokenStore';
 import { useUserStore } from '../store/userStore';
 import { BACKEND_URL } from '../config/env';
 import { queryClient } from '../services/queryClient';
-import { bumpSessionGeneration, clearSession } from '../services/session';
+import {
+  bumpSessionGeneration,
+  clearSession,
+  getSessionGeneration,
+} from '../services/session';
 import { withPasswordFlag } from '../utils/authErrors';
 
 let logoutInFlight = false;
@@ -42,9 +46,11 @@ export const useAuth = () => {
       hasFetchedUser.current = true;
 
       (async () => {
+        const generation = getSessionGeneration();
         try {
           const res = await apiClient.get('/auth/me');
-          if (!res) return;
+          // Logged out (or another account in) meanwhile: not this session's user.
+          if (!res || getSessionGeneration() !== generation) return;
           const me = res.data?.data?.user || res.data?.user;
           if (!me) return;
           if (me.id && !me._id) me._id = me.id;

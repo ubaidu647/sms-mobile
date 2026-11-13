@@ -29,8 +29,10 @@ import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import GeneratePayslipModal from './GeneratePayslipModal';
 import BulkPayrollModal from './BulkPayrollModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 function PayslipRow({ item, onTap, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const staff = item.staffId || {};
   const name = staff?.userId?.name || staff?.user?.name || staff?.name || '—';
   const ref = staff?.serialNumber || staff?.employeeId;
@@ -64,13 +66,13 @@ function PayslipRow({ item, onTap, C }) {
         <View style={styles.amountBlock}>
           <Text style={[styles.amountLabel, { color: C.mutedSoft }]}>GROSS</Text>
           <Text style={[styles.amountValue, { color: C.text }]} numberOfLines={1}>
-            {formatMoney(item.gross, item.currency)}
+            {formatMoney(item.gross, currencySymbol)}
           </Text>
         </View>
         <View style={[styles.amountBlock, { alignItems: 'flex-end' }]}>
           <Text style={[styles.amountLabel, { color: C.mutedSoft }]}>NET</Text>
           <Text style={[styles.amountValueNet, { color: COLORS.brand }]} numberOfLines={1}>
-            {formatMoney(item.netSalary, item.currency)}
+            {formatMoney(item.netSalary, currencySymbol)}
           </Text>
         </View>
       </View>

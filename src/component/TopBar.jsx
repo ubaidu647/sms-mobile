@@ -7,6 +7,8 @@ import { useColors, useIsDark } from '../theme/useColors';
 import { useTranslations } from '../i18n';
 import SettingsMenu from './SettingsMenu';
 
+const TOP_BAR_HEIGHT = 56;
+
 export default function TopBar({ onMenu }) {
   const user = useUserStore((s) => s.user);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
@@ -115,7 +117,7 @@ export default function TopBar({ onMenu }) {
 
 const styles = StyleSheet.create({
   bar: {
-    height: 56,
+    height: TOP_BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

@@ -1,18 +1,33 @@
 // Display helpers + status pills for the billing screen.
 // Mirror of web src/app/dashboard/system/packages/format.js (RN pill shape).
 
+// Plan and add-on prices and platform invoices are charged by the platform in
+// its own currency. They never follow the school's currency setting
+// (useSchoolCurrency), which labels the school's own money only. fmtMoney
+// prefixes the symbol: "Rs 3,000".
+export const PLATFORM_CURRENCY_SYMBOL = 'Rs';
+
 export const fmtMoney = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return '-';
-  return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const num = n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${PLATFORM_CURRENCY_SYMBOL} ${num}`;
 };
 
 export const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '-';
 
-// Effective limit = customLimits?.X ?? computedLimits.X
-export const effectiveLimit = (sub, key) =>
-  sub?.customLimits?.[key] ?? sub?.computedLimits?.[key] ?? null;
+// Effective limit = (customLimits?.X ?? computedLimits.X) + add-on units.
+// See src/utils/planAddons.js.
+export { effectiveLimit, formatLimit } from '../utils/planAddons';
+
+// Invoice `type` label: 'addon' → "Add-on" (pass the translated label),
+// otherwise title case.
+export const invoiceTypeLabel = (type, addonLabel = 'Add-on') => {
+  if (!type) return '';
+  if (type === 'addon') return addonLabel;
+  return String(type).charAt(0).toUpperCase() + String(type).slice(1);
+};
 
 // Validate a grace-period input. Blank is allowed (means "use default/carry-over").
 // Whole number, >= 0. Returns an error string, or '' when ok.

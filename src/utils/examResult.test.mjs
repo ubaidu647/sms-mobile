@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { missingPapersReason, sectionResultLabel } from './examResult.js';
+import { missingPapersReason, resultCardPlacement, sectionResultLabel } from './examResult.js';
 
 test('section label', () => {
   assert.equal(sectionResultLabel({ isPassed: true, missingCount: 0 }), 'PASS');
@@ -18,4 +18,18 @@ test('result card reason', () => {
   assert.equal(missingPapersReason({ isPassed: false, missingSubjectsCount: 0 }), null);
   assert.equal(missingPapersReason({ isPassed: true, missingSubjectsCount: 1 }), null);
   assert.equal(missingPapersReason(null), null);
+});
+
+test('result card placement prefers the exam class and recorded section', () => {
+  const current = { class: { name: 'Class 6' }, section: { name: 'B' } };
+  assert.deepEqual(
+    resultCardPlacement({ ...current, examClass: { name: 'Class 5' }, examSection: { name: 'A' } }),
+    { className: 'Class 5', sectionName: 'A' },
+  );
+  assert.deepEqual(resultCardPlacement(current), { className: 'Class 6', sectionName: 'B' });
+  assert.deepEqual(
+    resultCardPlacement({ ...current, examClass: null, examSection: null }),
+    { className: 'Class 6', sectionName: 'B' },
+  );
+  assert.deepEqual(resultCardPlacement(undefined), { className: '', sectionName: '' });
 });

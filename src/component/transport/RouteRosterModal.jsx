@@ -18,8 +18,10 @@ import {
 import { currentAcademicYear, formatMoney } from '../../constants/fee';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 export default function RouteRosterModal({ open, routeId, routeLabel, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const [academicYear, setAcademicYear] = useState(currentAcademicYear());
 
@@ -122,7 +124,7 @@ export default function RouteRosterModal({ open, routeId, routeLabel, onClose })
                       </Text>
                     </View>
                     <Text style={[styles.fee, { color: COLORS.brand }]}>
-                      {formatMoney(p.monthlyFee)}
+                      {formatMoney(p.monthlyFee, currencySymbol)}
                     </Text>
                   </View>
                 ))}

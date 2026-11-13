@@ -30,6 +30,8 @@ import {
 } from '../../../../src/utils/permissions';
 import EditStudentModal from '../../../../src/component/EditStudentModal';
 import TransferStudentModal from '../../../../src/component/TransferStudentModal';
+import { useSchoolCurrency } from '../../../../src/hooks/useSchoolCurrency';
+import { formatMoney } from '../../../../src/utils/money';
 
 function InfoRow({ icon, label, value, fallback = '—' }) {
   const C = useColors();
@@ -57,6 +59,7 @@ function Pill({ bg, fg, label }) {
 }
 
 export default function StudentDetailPage() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const router = useRouter();
   const { studentId } = useLocalSearchParams();
   const C = useColors();
@@ -102,7 +105,9 @@ export default function StudentDetailPage() {
     );
   }
 
-  if (error || !s) {
+  // Only with nothing to show: a refetch that fails over a loaded record (opening
+  // Edit refetches it) must not replace this screen, and the modal on it.
+  if (!s) {
     const msg =
       error?.response?.data?.message || error?.message || 'Student not found';
     return (
@@ -281,7 +286,7 @@ export default function StudentDetailPage() {
             <InfoRow
               icon="dollar-sign"
               label="Monthly Income"
-              value={s.father.monthlyIncome ? `PKR ${Number(s.father.monthlyIncome).toLocaleString()}` : null}
+              value={s.father.monthlyIncome ? formatMoney(s.father.monthlyIncome, currencySymbol) : null}
             />
           </Section>
         )}

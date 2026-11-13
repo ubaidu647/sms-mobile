@@ -35,6 +35,21 @@ export function parseAmountInput(text) {
 }
 
 /**
+ * The `paidAmount` of a payslip payment: `{ amount }`, or `{ invalid: true }`
+ * for unparseable text. `amount` is undefined only when nothing is owed (a fully
+ * deducted payslip settles without one). Empty means the full remaining balance
+ * and that figure is sent, never omitted: the server replays a held
+ * Idempotency-Key whatever it recorded when no amount is given, which would
+ * swallow this payment; with the amount it answers 409 and the key is replaced.
+ */
+export function instalmentAmount(text, remaining) {
+  if (!(remaining > 0)) return { invalid: false, amount: undefined };
+  const parsed = parseAmountInput(text);
+  if (parsed.invalid) return { invalid: true, amount: undefined };
+  return { invalid: false, amount: parsed.empty ? remaining : parsed.value };
+}
+
+/**
  * Why `month` can't be used to generate payslips, or null. Months after the
  * current one are refused: they have no attendance yet, so they would be paid
  * without deductions. The current month is allowed (schools pay on the 25th).

@@ -16,8 +16,10 @@ import { ASSIGNMENT_DIRECTION_LABELS } from '../../constants/transport';
 import { currentAcademicYear, formatMoney } from '../../constants/fee';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 export default function VehicleRosterModal({ open, vehicleId, vehicleLabel, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const [academicYear, setAcademicYear] = useState(currentAcademicYear());
 
@@ -118,7 +120,7 @@ export default function VehicleRosterModal({ open, vehicleId, vehicleLabel, onCl
                     {ASSIGNMENT_DIRECTION_LABELS[p.direction] || p.direction}
                   </Text>
                 </View>
-                <Text style={[styles.fee, { color: COLORS.brand }]}>{formatMoney(p.monthlyFee)}</Text>
+                <Text style={[styles.fee, { color: COLORS.brand }]}>{formatMoney(p.monthlyFee, currencySymbol)}</Text>
               </View>
             )}
           />

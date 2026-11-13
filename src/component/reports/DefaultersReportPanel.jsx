@@ -25,6 +25,7 @@ import { useBranchesDropdown } from '../../hooks/useBranchProfilesList';
 import { useDefaultersReport } from '../../hooks/useFees';
 import { useClassesForFee, useSectionsForFee } from '../../hooks/useFees';
 import { formatDate, formatMoney, formatMonth, todayYMD } from '../../constants/fee';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const REPORT_PAGE_SIZE = 100;
 
@@ -426,6 +427,7 @@ export default function DefaultersReportPanel() {
 }
 
 function Header({ report, totals, byBranch, rows, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   return (
     <View style={{ gap: 12 }}>
       <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -472,10 +474,10 @@ function Header({ report, totals, byBranch, rows, C }) {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[styles.branchClosing, { color: '#dc2626' }]}>
-                  {formatMoney(b.closingTotal)}
+                  {formatMoney(b.closingTotal, currencySymbol)}
                 </Text>
                 <Text style={[styles.branchBreakdown, { color: C.mutedSoft }]}>
-                  open {formatMoney(b.openingTotal)} · cur {formatMoney(b.currentPeriodTotal)}
+                  open {formatMoney(b.openingTotal, currencySymbol)} · cur {formatMoney(b.currentPeriodTotal, currencySymbol)}
                 </Text>
               </View>
             </View>
@@ -483,7 +485,7 @@ function Header({ report, totals, byBranch, rows, C }) {
           <View style={[styles.branchTotalRow, { backgroundColor: C.bg }]}>
             <Text style={[styles.branchTotalLabel, { color: C.text }]}>TOTAL</Text>
             <Text style={[styles.branchClosing, { color: '#dc2626' }]}>
-              {formatMoney(totals?.closingTotal)}
+              {formatMoney(totals?.closingTotal, currencySymbol)}
             </Text>
           </View>
         </View>
@@ -498,6 +500,7 @@ function Header({ report, totals, byBranch, rows, C }) {
 }
 
 function SummaryCard({ label, value, tone }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const tones = {
     amber: ['#f59e0b', '#d97706'],
     blue: ['#3b82f6', '#2563eb'],
@@ -507,12 +510,13 @@ function SummaryCard({ label, value, tone }) {
   return (
     <View style={[styles.summaryCard, { backgroundColor: bg2 }]}>
       <Text style={styles.summaryLabel}>{label.toUpperCase()}</Text>
-      <Text style={styles.summaryValue}>{formatMoney(value)}</Text>
+      <Text style={styles.summaryValue}>{formatMoney(value, currencySymbol)}</Text>
     </View>
   );
 }
 
 function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   return (
     <View style={[styles.studentCard, { backgroundColor: C.card, borderColor: C.border }]}>
       <View style={styles.studentTop}>
@@ -648,13 +652,13 @@ function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
                 </View>
                 <View style={styles.voucherAmounts}>
                   <Text style={[styles.voucherAmt, { color: C.muted }]}>
-                    Total {formatMoney(v.totalAmount)}
+                    Total {formatMoney(v.totalAmount, currencySymbol)}
                   </Text>
                   <Text style={[styles.voucherAmt, { color: '#059669' }]}>
-                    Paid {formatMoney(v.paidAmount)}
+                    Paid {formatMoney(v.paidAmount, currencySymbol)}
                   </Text>
                   <Text style={[styles.voucherAmt, { color: '#dc2626', fontWeight: '800' }]}>
-                    {formatMoney(v.balanceAmount)}
+                    {formatMoney(v.balanceAmount, currencySymbol)}
                   </Text>
                 </View>
               </View>
@@ -667,13 +671,14 @@ function DefaulterCard({ r, isOpen, showDetails, onToggle, onOpenSlip, C }) {
 }
 
 function Bal({ label, amount, months, tone, big, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   return (
     <View
       style={[styles.balCell, big && { borderLeftWidth: 3, borderLeftColor: tone, paddingLeft: 8 }]}
     >
       <Text style={[styles.balLabel, { color: C.mutedSoft }]}>{label.toUpperCase()}</Text>
       <Text style={[styles.balValue, { color: tone, fontSize: big ? 15 : 13 }]}>
-        {formatMoney(amount)}
+        {formatMoney(amount, currencySymbol)}
       </Text>
       {months != null && (
         <Text style={[styles.balMonths, { color: C.mutedSoft }]}>{months} mo</Text>
@@ -710,6 +715,7 @@ function FiltersModal({
   loading,
   C,
 }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   return (
     <Modal
       visible={open}
@@ -856,7 +862,7 @@ function FiltersModal({
           />
 
           <View>
-            <Text style={[styles.fLabel, { color: C.muted }]}>MIN OUTSTANDING (₨)</Text>
+            <Text style={[styles.fLabel, { color: C.muted }]}>MIN OUTSTANDING ({currencySymbol})</Text>
             <TextInput
               value={draftMinOutstanding}
               onChangeText={setDraftMinOutstanding}

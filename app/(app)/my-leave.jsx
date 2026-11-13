@@ -20,10 +20,11 @@ import LeaveBalanceCards from '../../src/component/leave/LeaveBalanceCards';
 import LeaveRequestCard from '../../src/component/leave/LeaveRequestCard';
 import LeaveFormModal from '../../src/component/leave/LeaveFormModal';
 import ReportPager from '../../src/component/ReportPager';
+import PlanFeatureGate from '../../src/component/PlanFeatureGate';
 
 const PAGE_SIZE = 20;
 
-export default function MyLeaveScreen() {
+function MyLeaveScreen() {
   const C = useColors();
   const { user } = useUserStore();
   const canApply = hasAnyAction(user?.role, ['apply-own-leave']);
@@ -207,3 +208,12 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 13, textAlign: 'center' },
 });
+
+// The plan may not include this module: show "Upgrade required" instead.
+export default function MyLeaveScreenRoute() {
+  return (
+    <PlanFeatureGate feature="leave">
+      <MyLeaveScreen />
+    </PlanFeatureGate>
+  );
+}

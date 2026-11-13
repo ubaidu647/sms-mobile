@@ -28,8 +28,10 @@ import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import ReportPager from '../ReportPager';
 import StructureFormModal from './StructureFormModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 function StructureRow({ item, canUpdate, canDelete, onEdit, onDeactivate, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const staff = item.staffId || {};
   const name = staff?.userId?.name || staff?.user?.name || staff?.name || '—';
   const ref = staff?.serialNumber || staff?.employeeId;
@@ -65,7 +67,7 @@ function StructureRow({ item, canUpdate, canDelete, onEdit, onDeactivate, C }) {
       </View>
 
       <View style={styles.statsRow}>
-        <Stat label="Basic" value={formatMoney(item.basicSalary, item.currency)} C={C} />
+        <Stat label="Basic" value={formatMoney(item.basicSalary, currencySymbol)} C={C} />
         <Stat
           label="Allowances"
           value={`${(item.allowances || []).length}`}

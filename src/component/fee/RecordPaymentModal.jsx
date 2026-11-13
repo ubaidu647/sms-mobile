@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +8,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
+import PaymentAccountPicker from '../PaymentAccountPicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useRecordPayment } from '../../hooks/useFees';
-import { newIdempotencyKey } from '../../utils/idempotency';
+import { nextPaymentKey, paymentKeyFor } from '../../utils/idempotency';
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -23,32 +23,38 @@ import {
   formatMoney,
 } from '../../constants/fee';
 import { localYMD, paymentDateError } from '../../utils/paymentDate';
+import { refId } from '../../utils/permissions';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 export default function RecordPaymentModal({ open, voucher, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
 
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(localYMD());
   const [method, setMethod] = useState('cash');
+  const [ledgerAccountId, setLedgerAccountId] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState(null);
-  // One key per payment attempt: minted on open and again after every recorded
-  // payment, reused only for retries of the same unsubmitted attempt so a
-  // resubmit after a lost response can't double-record.
+  // One key per payment attempt, reused for retries and across a reopen while
+  // the outcome is unknown, so a resubmit after a lost response can't
+  // double-record. See nextPaymentKey.
   const idempotencyKeyRef = useRef(null);
+  const keyTarget = `voucher:${voucher?._id}`;
 
   // Reset on the open transition only. Keyed on `open` alone: a voucher
   // refetch while open (e.g. after this payment invalidated it) must neither
   // mint a new key nor wipe the receipt being shown.
   useEffect(() => {
     if (!open) return;
-    idempotencyKeyRef.current = newIdempotencyKey();
+    idempotencyKeyRef.current = paymentKeyFor(keyTarget);
     setAmount(voucher?.balanceAmount != null ? String(voucher.balanceAmount) : '');
     setPaymentDate(localYMD());
     setMethod('cash');
+    setLedgerAccountId('');
     setReferenceNumber('');
     setNotes('');
     setReceipt(null);
@@ -58,10 +64,19 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
   const mut = useRecordPayment({
     onSuccess: (d) => {
       // This attempt is recorded; the next payment must not replay it.
-      idempotencyKeyRef.current = newIdempotencyKey();
+      idempotencyKeyRef.current = nextPaymentKey(keyTarget, idempotencyKeyRef.current);
       setReceipt(d);
     },
+    onError: (err) => {
+      idempotencyKeyRef.current = nextPaymentKey(keyTarget, idempotencyKeyRef.current, err);
+    },
   });
+
+  // Closing mid-request is refused: the key is only held once the request fails,
+  // so reopening before then would mint a new one and could record it twice.
+  const close = () => {
+    if (!mut.isPending) onClose();
+  };
 
   const refRequired = REFERENCE_REQUIRED_METHODS.includes(method);
 
@@ -75,7 +90,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
       Toast.show({
         type: 'error',
         text1: 'Exceeds balance',
-        text2: formatMoney(voucher?.balanceAmount),
+        text2: formatMoney(voucher?.balanceAmount, currencySymbol),
       });
       return;
     }
@@ -94,6 +109,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
       paymentDate: paymentDate.trim(),
       method,
     };
+    if (ledgerAccountId) payload.ledgerAccountId = ledgerAccountId;
     if (referenceNumber.trim()) payload.referenceNumber = referenceNumber.trim();
     if (notes.trim()) payload.notes = notes.trim();
     mut.mutate({ ...payload, idempotencyKey: idempotencyKeyRef.current });
@@ -102,11 +118,11 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
   if (!voucher) return null;
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
-      onRequestClose={onClose}
+      onRequestClose={close}
     >
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
@@ -119,7 +135,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
             </Text>
           </View>
           <Pressable
-            onPress={onClose}
+            onPress={close}
             hitSlop={10}
             style={({ pressed }) => [
               styles.closeBtn,
@@ -133,7 +149,6 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -152,7 +167,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
                 <Text style={styles.receiptNum}>{receipt?.payment?.receiptNumber || ''}</Text>
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Amount</Text>
-                  <Text style={styles.receiptValue}>{formatMoney(receipt?.payment?.amount)}</Text>
+                  <Text style={styles.receiptValue}>{formatMoney(receipt?.payment?.amount, currencySymbol)}</Text>
                 </View>
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Method</Text>
@@ -163,7 +178,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>New Balance</Text>
                   <Text style={[styles.receiptValue, { color: '#991b1b' }]}>
-                    {formatMoney(receipt?.voucher?.balanceAmount)}
+                    {formatMoney(receipt?.voucher?.balanceAmount, currencySymbol)}
                   </Text>
                 </View>
                 <Pressable
@@ -184,19 +199,19 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
                   <View style={styles.summaryCell}>
                     <Text style={[styles.summaryLabel, { color: C.mutedSoft }]}>TOTAL</Text>
                     <Text style={[styles.summaryValue, { color: C.text }]} numberOfLines={1}>
-                      {formatMoney(voucher.totalAmount)}
+                      {formatMoney(voucher.totalAmount, currencySymbol)}
                     </Text>
                   </View>
                   <View style={styles.summaryCell}>
                     <Text style={[styles.summaryLabel, { color: C.mutedSoft }]}>PAID</Text>
                     <Text style={[styles.summaryValue, { color: '#166534' }]} numberOfLines={1}>
-                      {formatMoney(voucher.paidAmount)}
+                      {formatMoney(voucher.paidAmount, currencySymbol)}
                     </Text>
                   </View>
                   <View style={styles.summaryCell}>
                     <Text style={[styles.summaryLabel, { color: C.mutedSoft }]}>BALANCE</Text>
                     <Text style={[styles.summaryValue, { color: '#991b1b' }]} numberOfLines={1}>
-                      {formatMoney(voucher.balanceAmount)}
+                      {formatMoney(voucher.balanceAmount, currencySymbol)}
                     </Text>
                   </View>
                 </View>
@@ -264,6 +279,14 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
                   </View>
                 </View>
 
+                <PaymentAccountPicker
+                  branchId={refId(voucher.branchId)}
+                  method={method}
+                  value={ledgerAccountId}
+                  onChange={setLedgerAccountId}
+                  disabled={mut.isPending}
+                />
+
                 <View>
                   <Text style={[styles.label, { color: C.muted }]}>
                     REFERENCE
@@ -325,7 +348,7 @@ export default function RecordPaymentModal({ open, voucher, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

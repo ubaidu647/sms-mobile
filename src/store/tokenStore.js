@@ -23,6 +23,8 @@ const secureStorage = {
   removeItem: (name) => SecureStore.deleteItemAsync(name),
 };
 
+const STORAGE_KEY = 'token-storage';
+
 // expo-secure-store has no web implementation (`npm run web` would never
 // hydrate), so the web build keeps the old AsyncStorage (localStorage) path.
 const storage = Platform.OS === 'web' ? AsyncStorage : secureStorage;
@@ -34,17 +36,19 @@ export const useTokenStore = create(
       refreshToken: null,
       hasHydrated: false,
 
-      setHasHydrated: (state) => set({ hasHydrated: state }),
       setTokens: (tokens) => set(tokens),
       clearTokens: () => set({ accessToken: null, refreshToken: null }),
     }),
     {
-      name: 'token-storage',
+      name: STORAGE_KEY,
       storage: createJSONStorage(() => storage),
       // Only the tokens are persisted; hydration state is runtime-only.
       partialize: ({ accessToken, refreshToken }) => ({ accessToken, refreshToken }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      // On a storage failure `state` is undefined. The app must still leave the
+      // splash (to sign-in), and the unreadable item must not fail every launch.
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) Promise.resolve(storage.removeItem(STORAGE_KEY)).catch(() => {});
+        useTokenStore.setState({ hasHydrated: true });
       },
     },
   ),

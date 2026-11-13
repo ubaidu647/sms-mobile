@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,7 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsMutating } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import {
@@ -20,9 +22,18 @@ import {
   useReversePayslipPayment,
   useUpdatePayslip,
 } from '../../../../../src/hooks/useStaffSalary';
-import { newIdempotencyKey } from '../../../../../src/utils/idempotency';
-import { componentAmount } from '../../../../../src/utils/money';
-import { filterAmountInput, parseAmountInput } from '../../../../../src/utils/payslipInput';
+import { nextPaymentKey, paymentKeyFor } from '../../../../../src/utils/idempotency';
+import {
+  fallbackPolicyNotice,
+  outsideEmploymentNote,
+  payslipLineAmount,
+} from '../../../../../src/utils/payslipDisplay';
+import {
+  filterAmountInput,
+  instalmentAmount,
+  parseAmountInput,
+} from '../../../../../src/utils/payslipInput';
+import PaymentAccountPicker from '../../../../../src/component/PaymentAccountPicker';
 import { useUserStore } from '../../../../../src/store/userStore';
 import {
   PAYMENT_METHODS,
@@ -34,9 +45,11 @@ import {
   formatMoney,
   todayISO,
 } from '../../../../../src/constants/staffSalary';
-import { canActOnBranch } from '../../../../../src/utils/permissions';
+import { canActOnBranch, refId } from '../../../../../src/utils/permissions';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
+import PlanFeatureGate from '../../../../../src/component/PlanFeatureGate';
+import { useSchoolCurrency } from '../../../../../src/hooks/useSchoolCurrency';
 
 function StatusBadges({ payslip, C }) {
   const cfg = PAYSLIP_STATUS_PILL[payslip.status] || PAYSLIP_STATUS_PILL.draft;
@@ -149,7 +162,8 @@ function PolicySnapshotBlock({ snapshot, C }) {
   );
 }
 
-export default function PayslipDetailPage() {
+function PayslipDetailPage() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const router = useRouter();
   const { payslipId } = useLocalSearchParams();
   const C = useColors();
@@ -176,6 +190,15 @@ export default function PayslipDetailPage() {
   const [showPay, setShowPay] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [reversing, setReversing] = useState(null);
+
+  // Leaving mid-payment is refused: the pay form's key dies with it, so paying
+  // again from a reopened form would record the instalment twice.
+  const paying = useIsMutating({ mutationKey: ['pay-payslip', payslipId] }) > 0;
+  useEffect(() => {
+    if (!paying) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, [paying]);
 
   const update = useUpdatePayslip({
     id: payslipId,
@@ -218,7 +241,8 @@ export default function PayslipDetailPage() {
   const isPartiallyPaid = status === 'partially-paid';
   const isPaid = status === 'paid';
   const isCancelled = status === 'cancelled';
-  const cur = payslip.currency || 'PKR';
+  // Salaries follow the school's currency (a label: nothing is converted).
+  const cur = currencySymbol;
 
   const staffName =
     payslip.staffId?.userId?.name ||
@@ -248,11 +272,13 @@ export default function PayslipDetailPage() {
 
   return (
     <View style={[styles.safe, { backgroundColor: C.bg }]}>
+      <Stack.Screen options={{ gestureEnabled: !paying }} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.headerRow}>
           <Pressable
             onPress={() => router.back()}
+            disabled={paying}
             hitSlop={10}
             style={({ pressed }) => [styles.backBtnIcon, pressed && { opacity: 0.6 }]}
           >
@@ -303,7 +329,7 @@ export default function PayslipDetailPage() {
             <LineRow
               key={i}
               label={`${a.name}${a.type === 'percent' ? ` (${a.amount}%)` : ''}`}
-              value={formatMoney(componentAmount(payslip.basicSalary, a), cur)}
+              value={formatMoney(payslipLineAmount(payslip.basicSalary, a), cur)}
               C={C}
             />
           ))}
@@ -333,7 +359,7 @@ export default function PayslipDetailPage() {
             <LineRow
               key={i}
               label={`${d.name}${d.type === 'percent' ? ` (${d.amount}%)` : ''}`}
-              value={formatMoney(componentAmount(payslip.basicSalary, d), cur)}
+              value={formatMoney(payslipLineAmount(payslip.basicSalary, d), cur)}
               C={C}
             />
           ))}
@@ -563,6 +589,11 @@ export default function PayslipDetailPage() {
                 C={C}
               />
             </View>
+            {!!outsideEmploymentNote(payslip.attendance) && (
+              <Text style={[styles.notesText, { color: C.muted, marginTop: 8 }]}>
+                {outsideEmploymentNote(payslip.attendance)}
+              </Text>
+            )}
           </View>
         )}
 
@@ -573,8 +604,7 @@ export default function PayslipDetailPage() {
             <View style={[styles.warnBox, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
               <Feather name="alert-triangle" size={14} color="#92400e" />
               <Text style={[styles.warnText, { color: '#92400e' }]}>
-                No salary policy was active at generation time — pro-rate fallback used (basic ÷
-                26 × unpaid days; absences and unpaid leave count 1, half-days ½).
+                {fallbackPolicyNotice(payslip.attendance)}
               </Text>
             </View>
           )
@@ -660,15 +690,27 @@ export default function PayslipDetailPage() {
 function PayForm({ payslip, onClose, C }) {
   const [paymentDate, setPaymentDate] = useState(todayISO());
   const [paymentMethod, setPaymentMethod] = useState('bank-transfer');
+  const [ledgerAccountId, setLedgerAccountId] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   // Defaults to what is still owed; enter less to pay an instalment.
   const remaining = payslip.balanceAmount ?? payslip.netSalary ?? 0;
   const [paidAmount, setPaidAmount] = useState(String(remaining));
   const [notes, setNotes] = useState('');
-  // One key per opened form, reused if Confirm is retried after a network error.
-  const [idempotencyKey] = useState(() => newIdempotencyKey());
+  // Reused for retries, and across a reopen while the outcome is unknown.
+  const keyTarget = `payslip:${payslip._id}`;
+  const idempotencyKeyRef = useRef(null);
+  if (!idempotencyKeyRef.current) idempotencyKeyRef.current = paymentKeyFor(keyTarget);
 
-  const pay = usePayPayslip({ id: payslip._id, onSuccess: () => onClose() });
+  const pay = usePayPayslip({
+    id: payslip._id,
+    onSuccess: () => {
+      nextPaymentKey(keyTarget, idempotencyKeyRef.current);
+      onClose();
+    },
+    onError: (err) => {
+      idempotencyKeyRef.current = nextPaymentKey(keyTarget, idempotencyKeyRef.current, err);
+    },
+  });
 
   const submit = () => {
     if (!paymentDate) {
@@ -684,17 +726,17 @@ function PayForm({ payslip, onClose, C }) {
       return;
     }
     const payload = { paymentDate, paymentMethod };
+    if (ledgerAccountId) payload.ledgerAccountId = ledgerAccountId;
     if (paymentReference.trim()) payload.paymentReference = paymentReference.trim();
     // A fully deducted payslip (nothing owed) is settled without an amount.
     // Empty pays the full remaining balance; anything typed must be a valid
     // number — an unparseable one used to be dropped, paying the full balance.
-    const amountIn = parseAmountInput(paidAmount);
-    if (remaining > 0 && amountIn.invalid) {
+    const { invalid, amount } = instalmentAmount(paidAmount, remaining);
+    if (invalid) {
       Toast.show({ type: 'error', text1: 'Enter a valid amount, or leave it empty to pay it all' });
       return;
     }
-    if (remaining > 0 && !amountIn.empty) {
-      const amount = amountIn.value;
+    if (amount !== undefined) {
       if (amount <= 0 || amount > remaining) {
         Toast.show({ type: 'error', text1: `Amount must be between 1 and ${remaining}` });
         return;
@@ -702,7 +744,7 @@ function PayForm({ payslip, onClose, C }) {
       payload.paidAmount = amount;
     }
     if (notes.trim()) payload.notes = notes.trim();
-    pay.mutate({ ...payload, idempotencyKey });
+    pay.mutate({ ...payload, idempotencyKey: idempotencyKeyRef.current });
   };
 
   return (
@@ -768,6 +810,14 @@ function PayForm({ payslip, onClose, C }) {
         </View>
       </View>
 
+      <PaymentAccountPicker
+        branchId={refId(payslip.branchId)}
+        method={paymentMethod}
+        value={ledgerAccountId}
+        onChange={setLedgerAccountId}
+        disabled={pay.isPending}
+      />
+
       <View>
         <Text style={[styles.fieldLabel, { color: C.muted }]}>
           REFERENCE
@@ -800,6 +850,7 @@ function PayForm({ payslip, onClose, C }) {
       <View style={styles.actionsRow}>
         <Pressable
           onPress={onClose}
+          disabled={pay.isPending}
           style={({ pressed }) => [
             styles.ghostBtn,
             { borderColor: C.border, backgroundColor: C.card },
@@ -1134,3 +1185,12 @@ const styles = StyleSheet.create({
   },
   ghostBtnText: { fontWeight: '700', fontSize: 13 },
 });
+
+// The plan may not include this module: show "Upgrade required" instead.
+export default function PayslipDetailPageRoute() {
+  return (
+    <PlanFeatureGate feature="staff-salary">
+      <PayslipDetailPage />
+    </PlanFeatureGate>
+  );
+}

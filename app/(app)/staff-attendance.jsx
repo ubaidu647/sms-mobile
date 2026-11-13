@@ -10,8 +10,9 @@ import CalendarViewPanel from '../../src/component/staffAttendance/CalendarViewP
 import MonthlySummaryPanel from '../../src/component/staffAttendance/MonthlySummaryPanel';
 import UnmarkedBranchesPanel from '../../src/component/staffAttendance/UnmarkedBranchesPanel';
 import OwnAttendancePanel from '../../src/component/staffAttendance/OwnAttendancePanel';
+import PlanFeatureGate from '../../src/component/PlanFeatureGate';
 
-export default function StaffAttendanceScreen() {
+function StaffAttendanceScreen() {
   const C = useColors();
   const { user } = useUserStore();
 
@@ -146,3 +147,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 });
+
+// The plan may not include this module: show "Upgrade required" instead.
+export default function StaffAttendanceScreenRoute() {
+  return (
+    <PlanFeatureGate feature="staff-attendance">
+      <StaffAttendanceScreen />
+    </PlanFeatureGate>
+  );
+}

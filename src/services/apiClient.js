@@ -7,6 +7,9 @@ import { BACKEND_URL } from '../config/env';
 import { clearSessionAndRedirect, getSessionGeneration } from './session';
 import { CLIENT_PLATFORM_HEADER, clientPlatformValue } from '../utils/clientPlatform';
 import { isPasswordChangeRequired, planRefusalMessage } from '../utils/authErrors';
+import { isPlanFeatureDisabledError } from '../utils/planFeatures';
+import { isStorageLimitError, storageLimitMessage } from '../utils/storageUsage';
+import { queryClient } from './queryClient';
 
 // Sent on EVERY request (login and refresh included): the backend refuses a
 // school whose plan does not include this platform (e.g. "Your school's plan
@@ -16,14 +19,20 @@ export const platformHeaders = {
   [CLIENT_PLATFORM_HEADER]: clientPlatformValue(Platform.OS),
 };
 
+// A request that hangs must fail into the normal error paths, not spin forever.
+const REQUEST_TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 const apiClient = axios.create({
   baseURL: BACKEND_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json', ...platformHeaders },
 });
 
 apiClient.interceptors.request.use((c) => {
   const t = useTokenStore.getState().accessToken;
   if (t) c.headers.Authorization = `Bearer ${t}`;
+  if (c.data instanceof FormData) c.timeout = UPLOAD_TIMEOUT_MS;
   return c;
 });
 
@@ -85,6 +94,38 @@ function flagPasswordChange() {
   if (user && !user.mustChangePassword) setUser({ ...user, mustChangePassword: true });
 }
 
+// A call into a module the school's plan lacks (403 PLAN_FEATURE_DISABLED).
+// Not a session problem: the request just fails, with the server's message
+// ("This module is not included in your school's plan…") as `error.message`
+// so every existing error toast/state shows it. The plan may have changed
+// while the app was open, so the cached plan status is refreshed (at most
+// every 30 s) and the menus/screen guards catch up.
+const PLAN_STATUS_KEY = ['billing', 'me', 'subscription', 'status'];
+let planStatusRefreshedAt = 0;
+function notePlanFeatureRefusal(error) {
+  const text = error.response?.data?.message;
+  if (typeof text === 'string' && text.trim()) error.message = text.trim();
+  error.isPlanFeatureDisabled = true;
+  const now = Date.now();
+  if (now - planStatusRefreshedAt > 30_000) {
+    planStatusRefreshedAt = now;
+    queryClient.invalidateQueries({ queryKey: PLAN_STATUS_KEY });
+  }
+}
+
+// An upload refused because the school's storage is full (403
+// STORAGE_LIMIT_REACHED, "Storage full: 1.9 GB of 2 GB used. …"). Handled
+// once here: the server's message becomes `error.message` (every upload
+// screen already toasts `response.data.message || message`), the error is
+// flagged, and the cached storage figures are refreshed so the billing screen
+// shows the real usage.
+const MY_SUBSCRIPTION_KEY = ['billing', 'me', 'subscription', 'current'];
+function noteStorageLimit(error) {
+  error.message = storageLimitMessage(error);
+  error.isStorageLimitReached = true;
+  queryClient.invalidateQueries({ queryKey: MY_SUBSCRIPTION_KEY });
+}
+
 // One refresh in flight per session generation; concurrent 401s await the
 // same promise. A new generation (after logout/login) never joins an old one.
 let refreshPromise = null;
@@ -96,7 +137,11 @@ function refreshTokens() {
     const { refreshToken } = useTokenStore.getState();
     refreshGeneration = generation;
     const p = axios
-      .post(`${BACKEND_URL}/auth/refresh`, { refreshToken }, { headers: platformHeaders })
+      .post(
+        `${BACKEND_URL}/auth/refresh`,
+        { refreshToken },
+        { headers: platformHeaders, timeout: REQUEST_TIMEOUT_MS },
+      )
       .then((res) => {
         // Logged out (or re-logged in) meanwhile: drop this result entirely so
         // a late response can't write tokens back into a cleared session.
@@ -133,6 +178,8 @@ apiClient.interceptors.response.use(
       const planMessage = planRefusalMessage(error);
       if (planMessage) endSessionForPlan(planMessage);
       else if (isPasswordChangeRequired(error)) flagPasswordChange();
+      else if (isPlanFeatureDisabledError(error)) notePlanFeatureRefusal(error);
+      else if (isStorageLimitError(error)) noteStorageLimit(error);
       return Promise.reject(error);
     }
 

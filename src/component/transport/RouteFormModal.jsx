@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -209,7 +208,7 @@ export default function RouteFormModal({ open, route, onClose }) {
   };
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -236,7 +235,6 @@ export default function RouteFormModal({ open, route, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -553,7 +551,7 @@ export default function RouteFormModal({ open, route, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

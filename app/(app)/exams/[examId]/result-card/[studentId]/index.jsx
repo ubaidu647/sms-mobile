@@ -17,7 +17,7 @@ import {
   formatDate,
   titleCase,
 } from '../../../../../../src/constants/exam';
-import { missingPapersReason } from '../../../../../../src/utils/examResult';
+import { missingPapersReason, resultCardPlacement } from '../../../../../../src/utils/examResult';
 
 function Info({ label, value, C }) {
   return (
@@ -128,6 +128,7 @@ export default function ResultCardPage() {
   }
 
   const { student, exam, subjects = [], summary } = card;
+  const placement = resultCardPlacement(student);
   const summaryGrade = GRADE_PILL[summary?.grade];
   const missingReason = missingPapersReason(summary);
 
@@ -168,8 +169,8 @@ export default function ResultCardPage() {
                 {student.name}
               </Text>
               <Text style={[styles.studentMeta, { color: C.muted }]} numberOfLines={1}>
-                {student.class?.name || ''}
-                {student.section?.name ? ` · ${student.section.name}` : ''}
+                {placement.className}
+                {placement.sectionName ? ` · ${placement.sectionName}` : ''}
               </Text>
               <Text style={[styles.studentMeta, { color: C.mutedSoft }]} numberOfLines={1}>
                 Roll {student.rollNumber || '—'}

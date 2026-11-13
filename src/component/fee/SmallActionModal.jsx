@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useColors } from '../../theme/useColors';
@@ -54,10 +53,9 @@ export default function SmallActionModal({
   const submitBg = submitTone === 'danger' ? '#b91c1c' : COLORS.brand;
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <ToastModal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: C.card }]}>
@@ -141,7 +139,7 @@ export default function SmallActionModal({
           </View>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </ToastModal>
   );
 }
 

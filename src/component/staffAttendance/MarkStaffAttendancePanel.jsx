@@ -28,6 +28,7 @@ import {
   titleCase,
 } from '../../constants/staffAttendance';
 import { isOnLeave } from '../../utils/leave';
+import { withUnpaidLeaveRule } from '../../utils/attendanceMark';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -183,6 +184,13 @@ export default function MarkStaffAttendancePanel() {
   const roster = useMemo(() => dailyData?.data?.roster || [], [dailyData]);
   const summary = dailyData?.data?.summary;
 
+  // Rows written by an approved leave request — skipped by the bulk actions:
+  // most bulk statuses would give the day back to the leave request.
+  const leaveRowIds = useMemo(
+    () => new Set(roster.filter((s) => isOnLeave(s.attendance)).map((s) => s.staffId)),
+    [roster],
+  );
+
   useEffect(() => {
     if (!roster.length) {
       setEntries({});
@@ -190,7 +198,7 @@ export default function MarkStaffAttendancePanel() {
     }
     const initial = {};
     roster.forEach((s) => {
-      initial[s.staffId] = {
+      initial[s.staffId] = withUnpaidLeaveRule({
         status: s.attendance?.status || 'present',
         reason: s.attendance?.reason || '',
         leaveType: s.attendance?.leaveType || '',
@@ -199,7 +207,7 @@ export default function MarkStaffAttendancePanel() {
         departureTime: s.attendance?.departureTime || '',
         notes: s.attendance?.notes || '',
         markedId: s.attendance?._id || null,
-      };
+      });
     });
     setEntries(initial);
   }, [roster]);
@@ -207,7 +215,7 @@ export default function MarkStaffAttendancePanel() {
   const updateEntry = (staffId, patch) => {
     setEntries((prev) => {
       const cur = prev[staffId] || { status: 'present' };
-      const next = { ...cur, ...patch };
+      const next = withUnpaidLeaveRule({ ...cur, ...patch });
       if (patch.status && patch.status !== 'leave') next.leaveType = '';
       if (patch.status && !ALLOWS_TIMES.includes(patch.status)) {
         next.arrivalTime = '';
@@ -221,6 +229,7 @@ export default function MarkStaffAttendancePanel() {
     setEntries((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((id) => {
+        if (leaveRowIds.has(id)) return;
         next[id] = {
           ...next[id],
           status,
@@ -283,7 +292,7 @@ export default function MarkStaffAttendancePanel() {
           return;
         }
         entry.leaveType = e.leaveType;
-        entry.isPaid = !!e.isPaid;
+        entry.isPaid = e.leaveType !== 'unpaid' && !!e.isPaid;
       }
       if (ALLOWS_TIMES.includes(e.status)) {
         if (e.arrivalTime) entry.arrivalTime = e.arrivalTime;

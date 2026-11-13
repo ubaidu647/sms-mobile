@@ -1,13 +1,12 @@
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from './KeyboardAvoidingView';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import StaffForm from './StaffForm';
@@ -19,7 +18,7 @@ export default function AddStaffModal({ open, onClose, canCreateAllBranch, userB
   const { mutate, isPending } = useCreateStaff({ onSuccess: () => onClose() });
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -48,7 +47,6 @@ export default function AddStaffModal({ open, onClose, canCreateAllBranch, userB
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -67,7 +65,7 @@ export default function AddStaffModal({ open, onClose, canCreateAllBranch, userB
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

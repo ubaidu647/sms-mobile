@@ -1,6 +1,5 @@
 // Mirror of sms-frontend/src/constants/staffSalary.js. Keep in sync.
 import { localYMD } from '../utils/localDate';
-import { round2 } from '../utils/money';
 
 export const COMPONENT_TYPES = ['fixed', 'percent'];
 
@@ -93,12 +92,10 @@ export function formatDate(iso) {
   });
 }
 
-export function formatMoney(n, currency = 'PKR') {
-  // Rounded to paisa so float noise (33333 × 7.5%) never shows as 2499.975.
-  const num = round2(n);
-  const sym = currency === 'PKR' ? '₨' : currency;
-  return `${sym} ${num.toLocaleString()}`;
-}
+// formatMoney(amount, symbol), rounded to 2 decimals so float noise
+// (33333 × 7.5%) never shows as 2499.975. Pass the school's symbol from
+// useSchoolCurrency(): salaries follow the school's currency.
+export { formatMoney } from '../utils/money';
 
 export function toYMD(iso) {
   if (!iso) return '';

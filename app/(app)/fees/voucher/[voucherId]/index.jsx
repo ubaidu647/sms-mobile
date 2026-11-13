@@ -21,6 +21,7 @@ import {
 } from '../../../../../src/constants/fee';
 import RecordPaymentModal from '../../../../../src/component/fee/RecordPaymentModal';
 import SmallActionModal from '../../../../../src/component/fee/SmallActionModal';
+import { useSchoolCurrency } from '../../../../../src/hooks/useSchoolCurrency';
 
 function Row({ label, value, valueColor, bold, divider, C }) {
   return (
@@ -54,6 +55,7 @@ function Row({ label, value, valueColor, bold, divider, C }) {
 }
 
 export default function VoucherDetailPage() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const { voucherId } = useLocalSearchParams();
   const router = useRouter();
   const C = useColors();
@@ -108,6 +110,11 @@ export default function VoucherDetailPage() {
   const status = v.status;
   const cfg = VOUCHER_STATUS_PILL[status] || VOUCHER_STATUS_PILL.unpaid;
   const isFinal = status === 'paid' || status === 'void';
+  // GET /fee/voucher/:id populates studentId (with `user`), classId and
+  // sectionId; list rows carry student/class/section. Read either shape.
+  const studentDoc = v.student ?? (typeof v.studentId === 'object' ? v.studentId : null);
+  const classDoc = v.class ?? (typeof v.classId === 'object' ? v.classId : null);
+  const sectionDoc = v.section ?? (typeof v.sectionId === 'object' ? v.sectionId : null);
 
   return (
     <View style={[styles.safe, { backgroundColor: C.bg }]}>
@@ -138,20 +145,20 @@ export default function VoucherDetailPage() {
           <View style={styles.studentRow}>
             <View style={styles.studentAvatar}>
               <Text style={styles.studentAvatarText}>
-                {(v.student?.user?.name?.[0] || '?').toUpperCase()}
+                {(studentDoc?.user?.name?.[0] || '?').toUpperCase()}
               </Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[styles.studentName, { color: C.text }]} numberOfLines={1}>
-                {v.student?.user?.name || '—'}
+                {studentDoc?.user?.name || '—'}
               </Text>
               <Text style={[styles.studentMeta, { color: C.muted }]} numberOfLines={1}>
-                {v.student?.admissionNumber || '—'}
-                {v.student?.rollNumber ? ` · Roll ${v.student.rollNumber}` : ''}
+                {studentDoc?.admissionNumber || '—'}
+                {studentDoc?.rollNumber ? ` · Roll ${studentDoc.rollNumber}` : ''}
               </Text>
               <Text style={[styles.studentMeta, { color: C.mutedSoft }]} numberOfLines={1}>
-                {v.class?.name || ''}
-                {v.section?.name ? ` · ${v.section.name}` : ''}
+                {classDoc?.name || ''}
+                {sectionDoc?.name ? ` · ${sectionDoc.name}` : ''}
               </Text>
             </View>
           </View>
@@ -172,11 +179,11 @@ export default function VoucherDetailPage() {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[styles.liAmount, { color: C.text }]}>
-                  {formatMoney(li.finalAmount)}
+                  {formatMoney(li.finalAmount, currencySymbol)}
                 </Text>
                 {li.finalAmount !== li.amount && (
                   <Text style={[styles.liStrike, { color: C.mutedSoft }]}>
-                    {formatMoney(li.amount)}
+                    {formatMoney(li.amount, currencySymbol)}
                   </Text>
                 )}
               </View>
@@ -186,17 +193,17 @@ export default function VoucherDetailPage() {
 
         {/* Totals */}
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Row label="Total" value={formatMoney(v.totalAmount)} C={C} />
+          <Row label="Total" value={formatMoney(v.totalAmount, currencySymbol)} C={C} />
           {v.discountApplied > 0 && (
             <Row label={`Discount (${v.discountApplied}%)`} value="applied" C={C} />
           )}
           {v.lateFee > 0 && (
-            <Row label="Late Fee" value={formatMoney(v.lateFee)} valueColor="#991b1b" C={C} />
+            <Row label="Late Fee" value={formatMoney(v.lateFee, currencySymbol)} valueColor="#991b1b" C={C} />
           )}
-          <Row label="Paid" value={formatMoney(v.paidAmount)} valueColor="#166534" C={C} />
+          <Row label="Paid" value={formatMoney(v.paidAmount, currencySymbol)} valueColor="#166534" C={C} />
           <Row
             label="Balance"
-            value={formatMoney(v.balanceAmount)}
+            value={formatMoney(v.balanceAmount, currencySymbol)}
             valueColor={v.balanceAmount > 0 ? '#991b1b' : C.text}
             bold
             divider
@@ -235,7 +242,7 @@ export default function VoucherDetailPage() {
                   </Text>
                 </View>
                 <Text style={[styles.paymentAmount, { color: p.isVoid ? '#991b1b' : C.text }]}>
-                  {formatMoney(p.amount)}
+                  {formatMoney(p.amount, currencySymbol)}
                 </Text>
               </View>
             ))}

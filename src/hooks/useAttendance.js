@@ -2,6 +2,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { keptAsLeaveCount, keptAsLeaveMessage } from '../utils/leave';
+import { skippedUnmarkedMessage } from '../utils/attendanceMark';
 import { showWarnings } from './useLeave';
 
 /**
@@ -135,7 +136,10 @@ export function useMarkAttendance({ onSuccess } = {}) {
       queryClient.invalidateQueries({ queryKey: ['attendance-student-summary'] });
       const msg = res?.message || 'Attendance saved';
       const leaveNote = keptAsLeaveMessage(keptAsLeaveCount(vars.roster, vars.entries, 'studentId'));
-      Toast.show({ type: 'success', text1: msg, ...(leaveNote ? { text2: leaveNote } : {}) });
+      const note = [leaveNote, skippedUnmarkedMessage(res?.data?.skippedUnmarked)]
+        .filter(Boolean)
+        .join(' · ');
+      Toast.show({ type: 'success', text1: msg, ...(note ? { text2: note } : {}) });
       showWarnings(res);
       onSuccess?.(res?.data);
     },

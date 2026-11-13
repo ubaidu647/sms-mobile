@@ -1,9 +1,6 @@
 import { useEffect } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from './KeyboardAvoidingView';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -99,7 +98,7 @@ export default function TransferStudentModal({ open, student, onClose }) {
   };
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -128,7 +127,6 @@ export default function TransferStudentModal({ open, student, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -305,7 +303,7 @@ export default function TransferStudentModal({ open, student, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

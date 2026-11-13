@@ -28,9 +28,29 @@ import {
   createStudentSchema,
   editStudentSchema,
 } from '../validation/studentSchema';
+import {
+  emptiedRequiredMessage,
+  nestedFormPatch,
+  scalarFormEntries,
+} from '../utils/scalarFormEntries';
 import { useColors } from '../theme/useColors';
 import { COLORS } from '../theme/colors';
 import { PASSWORD_MIN } from '../utils/changePassword';
+import { useSchoolCurrency } from '../hooks/useSchoolCurrency';
+
+// The API refuses to clear these (PUT /student/:id, form fields of its nested
+// objects included): emptied ones stop the save.
+const STUDENT_REQUIRED_ON_EDIT = {
+  name: 'Name is required',
+  dob: 'Date of birth is required',
+  gender: 'Gender is required',
+  academicStatus: 'Academic status is required',
+  fatherName: "Father's name is required",
+  motherName: "Mother's name is required",
+  emergencyName: 'Emergency contact name is required',
+  emergencyPhone: 'Emergency contact phone is required',
+  emergencyRelation: 'Emergency contact relation is required',
+};
 
 function Section({ title, children }) {
   const C = useColors();
@@ -198,6 +218,7 @@ export default function StudentForm({
   isPending,
   submitLabel,
 }) {
+  const { code: currencyCode } = useSchoolCurrency();
   const C = useColors();
   const schema = mode === 'create' ? createStudentSchema : editStudentSchema;
 
@@ -339,12 +360,15 @@ export default function StudentForm({
   };
 
   const submit = (data) => {
-    const fd = new FormData();
+    if (mode === 'edit') {
+      const message = emptiedRequiredMessage(data, defaultValues, STUDENT_REQUIRED_ON_EDIT);
+      if (message) {
+        Toast.show({ type: 'error', text1: 'Please fix the highlighted fields', text2: message });
+        return;
+      }
+    }
 
-    const appendIfSet = (key, value) => {
-      if (value !== '' && value !== null && value !== undefined)
-        fd.append(key, String(value));
-    };
+    const fd = new FormData();
 
     const scalars =
       mode === 'create'
@@ -387,7 +411,11 @@ export default function StudentForm({
             'feeNotes',
           ];
 
-    for (const k of scalars) appendIfSet(k, data[k]);
+    const clearing =
+      mode === 'edit'
+        ? { initial: defaultValues, required: Object.keys(STUDENT_REQUIRED_ON_EDIT) }
+        : {};
+    for (const [k, v] of scalarFormEntries(data, scalars, clearing)) fd.append(k, v);
 
     // Drop branchId on create when not allowed
     if (mode === 'create' && !canCreateAllBranch) {
@@ -396,49 +424,36 @@ export default function StudentForm({
     }
 
     // Nested objects
-    const father = {
-      name: data.fatherName || '',
-      cnic: data.fatherCnic || '',
-      phone: data.fatherPhone || '',
-      email: data.fatherEmail || '',
-      occupation: data.fatherOccupation || '',
-      ...(data.fatherMonthlyIncome
-        ? { monthlyIncome: Number(data.fatherMonthlyIncome) }
-        : {}),
+    const appendNested = (key, keys) => {
+      const patch = nestedFormPatch(keys, data, clearing);
+      if (patch) fd.append(key, JSON.stringify(patch));
     };
-    if (Object.values(father).some((v) => v !== '' && v != null)) {
-      fd.append('father', JSON.stringify(father));
-    }
-
-    const mother = {
-      name: data.motherName || '',
-      cnic: data.motherCnic || '',
-      phone: data.motherPhone || '',
-      occupation: data.motherOccupation || '',
-    };
-    if (Object.values(mother).some((v) => v !== '' && v != null)) {
-      fd.append('mother', JSON.stringify(mother));
-    }
-
-    const emerg = {
-      name: data.emergencyName || '',
-      phone: data.emergencyPhone || '',
-      relation: data.emergencyRelation || '',
-    };
-    if (Object.values(emerg).some((v) => v !== '')) {
-      fd.append('emergencyContact', JSON.stringify(emerg));
-    }
-
-    const address = {
-      street: data.street || '',
-      city: data.city || '',
-      state: data.state || '',
-      postalCode: data.postalCode || '',
-      country: data.country || '',
-    };
-    if (Object.values(address).some((v) => v !== '')) {
-      fd.append('address', JSON.stringify(address));
-    }
+    appendNested('father', {
+      name: 'fatherName',
+      cnic: 'fatherCnic',
+      phone: 'fatherPhone',
+      email: 'fatherEmail',
+      occupation: 'fatherOccupation',
+      monthlyIncome: 'fatherMonthlyIncome',
+    });
+    appendNested('mother', {
+      name: 'motherName',
+      cnic: 'motherCnic',
+      phone: 'motherPhone',
+      occupation: 'motherOccupation',
+    });
+    appendNested('emergencyContact', {
+      name: 'emergencyName',
+      phone: 'emergencyPhone',
+      relation: 'emergencyRelation',
+    });
+    appendNested('address', {
+      street: 'street',
+      city: 'city',
+      state: 'state',
+      postalCode: 'postalCode',
+      country: 'country',
+    });
 
     if (
       mode === 'create' &&
@@ -691,7 +706,7 @@ export default function StudentForm({
         <Field label="Occupation">
           <TextFieldCtl control={control} name="fatherOccupation" placeholder="Engineer" />
         </Field>
-        <Field label="Monthly Income (PKR)" error={errors.fatherMonthlyIncome?.message}>
+        <Field label={`Monthly Income (${currencyCode})`} error={errors.fatherMonthlyIncome?.message}>
           <TextFieldCtl
             control={control}
             name="fatherMonthlyIncome"

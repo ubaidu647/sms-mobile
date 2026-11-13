@@ -2,7 +2,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { componentAmount, componentTotal, round2 } from './money.js';
+import {
+  componentAmount,
+  componentTotal,
+  DEFAULT_SCHOOL_CURRENCY,
+  formatMoney,
+  round2,
+  SCHOOL_CURRENCIES,
+  schoolCurrencyFrom,
+} from './money.js';
+
+const n = (x) => x.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 test('round2 trims float noise to paisa', () => {
   assert.equal(round2(0.1 + 0.2), 0.3);
@@ -28,4 +38,48 @@ test('componentTotal matches the server: sum raw, skip negatives, round once', (
   assert.equal(componentTotal(33333, list), 4694.89);
   assert.equal(componentTotal(1000, []), 0);
   assert.equal(componentTotal(1000, undefined), 0);
+});
+
+test('formatMoney puts the symbol before the rounded, grouped amount', () => {
+  assert.equal(formatMoney(1500, 'Rs'), `Rs ${n(1500)}`);
+  assert.equal(formatMoney(1234567.891, '$'), `$ ${n(1234567.89)}`);
+  assert.equal(formatMoney(2499.975, 'AED'), `AED ${n(2499.98)}`);
+  assert.equal(formatMoney('12.5', '€'), `€ ${n(12.5)}`);
+  assert.equal(formatMoney(-500, '£'), `£ ${n(-500)}`);
+});
+
+test('formatMoney falls back to Rs and to 0', () => {
+  assert.equal(formatMoney(100), `Rs ${n(100)}`);
+  assert.equal(formatMoney(100, ''), `Rs ${n(100)}`);
+  assert.equal(formatMoney(100, null), `Rs ${n(100)}`);
+  assert.equal(formatMoney(undefined, '₹'), '₹ 0');
+  assert.equal(formatMoney('abc', '₹'), '₹ 0');
+});
+
+test('schoolCurrencyFrom reads the settings payload', () => {
+  assert.deepEqual(schoolCurrencyFrom({ currency: 'AED', currencySymbol: 'AED' }), {
+    code: 'AED',
+    symbol: 'AED',
+  });
+  assert.deepEqual(schoolCurrencyFrom({ currency: 'INR' }), { code: 'INR', symbol: '₹' });
+  assert.deepEqual(schoolCurrencyFrom({ currency: 'usd', currencySymbol: ' ' }), {
+    code: 'USD',
+    symbol: '$',
+  });
+});
+
+test('schoolCurrencyFrom falls back to PKR / Rs', () => {
+  assert.deepEqual(DEFAULT_SCHOOL_CURRENCY, { code: 'PKR', symbol: 'Rs' });
+  assert.deepEqual(schoolCurrencyFrom(undefined), DEFAULT_SCHOOL_CURRENCY);
+  assert.deepEqual(schoolCurrencyFrom(null), DEFAULT_SCHOOL_CURRENCY);
+  assert.deepEqual(schoolCurrencyFrom({}), DEFAULT_SCHOOL_CURRENCY);
+  assert.deepEqual(schoolCurrencyFrom({ currency: 'XYZ', currencySymbol: 'X' }), DEFAULT_SCHOOL_CURRENCY);
+});
+
+test('SCHOOL_CURRENCIES matches the API list', () => {
+  assert.deepEqual(
+    SCHOOL_CURRENCIES.map((c) => c.code),
+    ['PKR', 'INR', 'BDT', 'AFN', 'AED', 'SAR', 'QAR', 'OMR', 'KWD', 'BHD', 'USD', 'GBP', 'EUR'],
+  );
+  assert.equal(SCHOOL_CURRENCIES.find((c) => c.code === 'PKR').symbol, 'Rs');
 });

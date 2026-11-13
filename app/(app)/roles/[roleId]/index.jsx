@@ -24,6 +24,8 @@ import {
   AVAILABLE_ACTIONS,
 } from '../../../../src/constants/rolePermissions';
 import EditRoleModal from '../../../../src/component/EditRoleModal';
+import { usePlanFeatures } from '../../../../src/hooks/usePlanFeatures';
+import { featureForMenu } from '../../../../src/utils/planFeatures';
 
 const MENU_LABELS = Object.fromEntries(AVAILABLE_MENUS.map((m) => [m.key, m.label]));
 const ACTION_DEFS = Object.fromEntries(AVAILABLE_ACTIONS.map((a) => [a.key, a]));
@@ -64,6 +66,7 @@ export default function RoleDetailPage() {
   const { user } = useUserStore();
 
   const { data: role, isLoading, error } = useRoleDetail(roleId);
+  const { isEnabled } = usePlanFeatures();
 
   const userBranchId =
     (typeof user?.branchId === 'string' && user.branchId) ||
@@ -140,16 +143,25 @@ export default function RoleDetailPage() {
     );
   }
 
-  const groupedActions = AVAILABLE_MENUS.filter((m) => role.menus?.includes(m.key))
+  // Menus/actions of modules the school's plan lacks are not shown. The role
+  // still holds them (an edit saves them back untouched).
+  const inPlan = (menuKey) => isEnabled(featureForMenu(menuKey));
+  const shownMenus = (role.menus || []).filter(inPlan);
+  const shownActions = (role.actions || []).filter((a) => {
+    const def = ACTION_DEFS[a];
+    return !def || inPlan(def.menu);
+  });
+
+  const groupedActions = AVAILABLE_MENUS.filter((m) => shownMenus.includes(m.key))
     .map((m) => ({
       ...m,
-      actions: (role.actions || []).filter((a) => ACTION_DEFS[a]?.menu === m.key),
+      actions: shownActions.filter((a) => ACTION_DEFS[a]?.menu === m.key),
     }))
     .filter((g) => g.actions.length > 0);
 
-  const ungroupedActions = (role.actions || []).filter((a) => {
+  const ungroupedActions = shownActions.filter((a) => {
     const def = ACTION_DEFS[a];
-    return !def || !role.menus?.includes(def.menu);
+    return !def || !shownMenus.includes(def.menu);
   });
 
   return (
@@ -189,14 +201,14 @@ export default function RoleDetailPage() {
           <InfoCard label="Serial No." value={role.serialNumber} />
           <InfoCard label="Created" value={fmtDate(role.createdAt)} />
           <InfoCard label="Updated" value={fmtDate(role.updatedAt)} />
-          <InfoCard label="Actions Count" value={`${role.actions?.length ?? 0}`} />
+          <InfoCard label="Actions Count" value={`${shownActions.length}`} />
         </View>
 
         <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text }]}>Menus</Text>
-          {role.menus?.length ? (
+          {shownMenus.length ? (
             <View style={styles.chipWrap}>
-              {role.menus.map((m) => (
+              {shownMenus.map((m) => (
                 <View key={m} style={styles.menuChip}>
                   <Text style={styles.menuChipText}>{MENU_LABELS[m] || m}</Text>
                 </View>
@@ -209,7 +221,7 @@ export default function RoleDetailPage() {
 
         <View style={[styles.section, { backgroundColor: C.card, borderColor: C.border }]}>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            Actions ({role.actions?.length ?? 0})
+            Actions ({shownActions.length})
           </Text>
           {groupedActions.length === 0 && ungroupedActions.length === 0 && (
             <Text style={[styles.emptyText, { color: C.mutedSoft }]}>

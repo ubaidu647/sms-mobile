@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AttendancePickers from './AttendancePickers';
+import QueryErrorState from '../QueryErrorState';
 import { useSectionDaily, useMarkAttendance } from '../../hooks/useAttendance';
 import {
   ATTENDANCE_STATUSES,
@@ -105,7 +106,7 @@ export default function MarkAttendancePanel({ canMark }) {
   const [sectionId, setSectionId] = useState('');
   const [date, setDate] = useState(todayISO());
 
-  const { data, isLoading, refetch } = useSectionDaily({
+  const { data, isLoading, isError, error, refetch } = useSectionDaily({
     classId,
     sectionId,
     date,
@@ -140,6 +141,9 @@ export default function MarkAttendancePanel({ canMark }) {
   const setAll = (status) => {
     const next = { ...edits };
     for (const r of roster) {
+      // Approved leave is not overwritten by accident: most bulk statuses would
+      // give the day back to the leave request. A row can still be changed by hand.
+      if (isOnLeave(r.attendance)) continue;
       next[r.studentId] = { ...(next[r.studentId] || {}), status };
     }
     setEdits(next);
@@ -203,6 +207,13 @@ export default function MarkAttendancePanel({ canMark }) {
         <EmptyState icon="users" text="Pick a class and section to load the roster." C={C} />
       ) : isLoading ? (
         <LoadingState />
+      ) : isError && !data ? (
+        <QueryErrorState
+          error={error}
+          fallback="Could not load the roster"
+          onRetry={refetch}
+          style={{ flex: 0 }}
+        />
       ) : roster.length === 0 ? (
         <EmptyState icon="inbox" text="No students enrolled in this section." C={C} />
       ) : (

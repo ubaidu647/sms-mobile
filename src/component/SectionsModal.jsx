@@ -2,15 +2,14 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from './KeyboardAvoidingView';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -186,7 +185,7 @@ export default function SectionsModal({
   };
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -274,7 +273,7 @@ export default function SectionsModal({
       </SafeAreaView>
 
       {/* Add Section */}
-      <Modal
+      <ToastModal
         visible={addOpen}
         animationType="slide"
         presentationStyle="formSheet"
@@ -302,7 +301,6 @@ export default function SectionsModal({
           </View>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <ScrollView
               contentContainerStyle={styles.body}
@@ -318,10 +316,10 @@ export default function SectionsModal({
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
-      </Modal>
+      </ToastModal>
 
       {/* Edit Section */}
-      <Modal
+      <ToastModal
         visible={!!editSection}
         animationType="slide"
         presentationStyle="formSheet"
@@ -349,7 +347,6 @@ export default function SectionsModal({
           </View>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
             <ScrollView
               contentContainerStyle={styles.body}
@@ -368,8 +365,8 @@ export default function SectionsModal({
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
-      </Modal>
-    </Modal>
+      </ToastModal>
+    </ToastModal>
   );
 }
 

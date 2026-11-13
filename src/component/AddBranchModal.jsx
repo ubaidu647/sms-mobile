@@ -1,9 +1,6 @@
 import { useEffect } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from './KeyboardAvoidingView';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -23,7 +22,6 @@ import { useColors } from '../theme/useColors';
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
-  { value: 'disabled', label: 'Disabled' },
 ];
 
 function Field({ control, name, label, errors, required, ...inputProps }) {
@@ -73,7 +71,6 @@ export default function AddBranchModal({ open, onClose }) {
       address: '',
       email: '',
       phone: '',
-      managerName: '',
       status: 'active',
     },
   });
@@ -92,7 +89,7 @@ export default function AddBranchModal({ open, onClose }) {
   const onSubmit = (data) => mutate(data);
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -121,7 +118,6 @@ export default function AddBranchModal({ open, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             contentContainerStyle={styles.body}
@@ -143,6 +139,7 @@ export default function AddBranchModal({ open, onClose }) {
               name="address"
               label="Address"
               errors={errors}
+              required
               placeholder="Street, city"
               multiline
               numberOfLines={2}
@@ -164,14 +161,6 @@ export default function AddBranchModal({ open, onClose }) {
               errors={errors}
               placeholder="+92 300 0000000"
               keyboardType="phone-pad"
-            />
-            <Field
-              control={control}
-              name="managerName"
-              label="Manager Name"
-              errors={errors}
-              placeholder="Full name"
-              autoCapitalize="words"
             />
 
             <View style={styles.field}>
@@ -248,7 +237,7 @@ export default function AddBranchModal({ open, onClose }) {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

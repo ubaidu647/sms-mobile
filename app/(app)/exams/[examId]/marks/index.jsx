@@ -15,13 +15,14 @@ import {
   useEnterMarks,
   useExamDetail,
   useExamResults,
+  useExamRoster,
   useSectionsForExam,
-  useStudentsBySection,
 } from '../../../../../src/hooks/useExams';
 import { useUserStore } from '../../../../../src/store/userStore';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 import { hasAnyAction } from '../../../../../src/utils/permissions';
+import QueryErrorState from '../../../../../src/component/QueryErrorState';
 import {
   buildMarkEntries,
   cleanMarkInput,
@@ -77,16 +78,22 @@ export default function MarksEntryPage() {
   });
   const sections = sectionData?.data || [];
 
-  const { data: students, isLoading: studentsLoading } = useStudentsByList({
-    sectionId,
-  });
+  const roster = useExamRoster({ examId, sectionId });
+  const students = roster.data || EMPTY;
+  const studentsLoading = roster.isLoading;
 
-  const { data: resultsData, isFetching: resultsLoading } = useExamResults({
+  const results = useExamResults({
     examId,
     examSubjectId,
     sectionId,
   });
+  const resultsData = results.data;
+  const resultsLoading = results.isFetching;
   const existingResults = resultsData || EMPTY;
+  // Without the saved marks every row would seed blank, and saving would be
+  // done blind over marks that exist.
+  const resultsFailed = results.isError;
+  const loadFailed = (roster.isError && !roster.data) || (resultsFailed && !resultsData);
 
   // Students the user has typed into for the current subject+section. Their
   // entries are never overwritten by a refetch; only untouched rows are
@@ -166,7 +173,7 @@ export default function MarksEntryPage() {
     }
     const invalid = invalidMarkStudents(students, marks, { hasTheory, hasPractical });
     if (invalid.length) {
-      const names = invalid.map((s) => s.user?.name || s.rollNumber || s._id);
+      const names = invalid.map((s) => s.name || s.rollNumber || s._id);
       const more = names.length > 3 ? ` +${names.length - 3} more` : '';
       Toast.show({
         type: 'error',
@@ -232,6 +239,7 @@ export default function MarksEntryPage() {
 
   const cfg = EXAM_STATUS_PILL[exam.status] || EXAM_STATUS_PILL.planned;
   const editingDisabled = isLocked || !canEnter || isViewOnly;
+  const saveDisabled = editingDisabled || enter.isPending || resultsFailed;
 
   return (
     <View style={[styles.safe, { backgroundColor: C.bg }]}>
@@ -363,6 +371,18 @@ export default function MarksEntryPage() {
           <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
             <ActivityIndicator size="large" color={COLORS.brand} />
           </View>
+        ) : loadFailed ? (
+          <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
+            <QueryErrorState
+              error={roster.error || results.error}
+              fallback="Could not load the marks for this section"
+              onRetry={() => {
+                if (roster.isError) roster.refetch();
+                if (resultsFailed) results.refetch();
+              }}
+              style={{ flex: 0 }}
+            />
+          </View>
         ) : students.length === 0 ? (
           <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
             <Feather name="inbox" size={28} color={C.mutedSoft} />
@@ -372,6 +392,18 @@ export default function MarksEntryPage() {
           </View>
         ) : (
           <>
+            {resultsFailed && (
+              <View style={[styles.banner, { backgroundColor: '#fee2e2', borderColor: '#fecaca' }]}>
+                <Feather name="alert-circle" size={14} color="#991b1b" />
+                <Text style={[styles.bannerText, { color: '#991b1b' }]}>
+                  Could not refresh the saved marks. Saving is off until they load.
+                </Text>
+                <Pressable onPress={() => results.refetch()} hitSlop={10}>
+                  <Text style={{ color: '#991b1b', fontSize: 12, fontWeight: '800' }}>Retry</Text>
+                </Pressable>
+              </View>
+            )}
+
             <View style={[styles.summaryBar, { backgroundColor: C.card, borderColor: C.border }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.summaryText, { color: C.muted }]}>
@@ -383,10 +415,10 @@ export default function MarksEntryPage() {
               {canEnter && !isViewOnly && (
                 <Pressable
                   onPress={handleSave}
-                  disabled={editingDisabled || enter.isPending}
+                  disabled={saveDisabled}
                   style={({ pressed }) => [
                     styles.saveBtn,
-                    (editingDisabled || enter.isPending || pressed) && { opacity: 0.85 },
+                    (saveDisabled || pressed) && { opacity: 0.85 },
                   ]}
                 >
                   {enter.isPending ? (
@@ -414,7 +446,7 @@ export default function MarksEntryPage() {
                   <View style={styles.studentHeader}>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.studentName, { color: C.text }]} numberOfLines={1}>
-                        {s.user?.name || '—'}
+                        {s.name || '—'}
                       </Text>
                       <Text style={[styles.studentMeta, { color: C.muted }]} numberOfLines={1}>
                         Roll {s.rollNumber || '—'}
@@ -519,10 +551,10 @@ export default function MarksEntryPage() {
             {canEnter && !isViewOnly && (
               <Pressable
                 onPress={handleSave}
-                disabled={editingDisabled || enter.isPending}
+                disabled={saveDisabled}
                 style={({ pressed }) => [
                   styles.submitBtn,
-                  (editingDisabled || enter.isPending || pressed) && { opacity: 0.85 },
+                  (saveDisabled || pressed) && { opacity: 0.85 },
                 ]}
               >
                 {enter.isPending ? (
@@ -573,18 +605,6 @@ function Stat({ label, value, C }) {
       </Text>
     </View>
   );
-}
-
-// Adapter to keep the call site short: unwrap data array from the api response.
-function useStudentsByList({ sectionId }) {
-  const q = useStudentsBySection({ sectionId });
-  const list = q.data?.data;
-  const data = useMemo(() => (Array.isArray(list) ? list : EMPTY), [list]);
-  return {
-    data,
-    isLoading: q.isLoading,
-    refetch: q.refetch,
-  };
 }
 
 const styles = StyleSheet.create({

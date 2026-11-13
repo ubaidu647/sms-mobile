@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import ToastModal from '../ToastModal';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
@@ -374,7 +374,7 @@ function Pill({ bg, fg, icon, label }) {
 
 function FiltersModal({ open, onClose, draft, setDraft, onApply, onClear, branches, showBranchFilter, C }) {
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.modalSafe, { backgroundColor: C.bg }]}>
         <View style={[styles.modalHeader, { backgroundColor: C.card, borderBottomColor: C.border }]}>
           <Text style={[styles.modalTitle, { color: C.text }]}>Filters</Text>
@@ -497,7 +497,7 @@ function FiltersModal({ open, onClose, draft, setDraft, onApply, onClear, branch
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </ToastModal>
   );
 }
 
@@ -601,7 +601,7 @@ function ActionSheet({
     });
 
   return (
-    <Modal visible animationType="fade" transparent onRequestClose={onClose}>
+    <ToastModal visible animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.actionBackdrop} onPress={onClose}>
         <Pressable
           onPress={(e) => e.stopPropagation()}
@@ -649,7 +649,7 @@ function ActionSheet({
           </Pressable>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ToastModal>
   );
 }
 

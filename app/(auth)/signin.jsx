@@ -2,8 +2,6 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../../src/component/KeyboardAvoidingView';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,7 +38,6 @@ export default function SignIn() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -51,7 +49,8 @@ export default function SignIn() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.brandTitle}>nodeCampus</Text>
+            <Text style={styles.brandTitle}>Mizenzo</Text>
+            <Text style={styles.brandSub}>School Management</Text>
           </View>
 
           <View style={styles.card}>
@@ -165,8 +164,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f9fafb' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   brand: { alignItems: 'center', marginBottom: 24 },
-  logo: { width: 72, height: 72 },
+  logo: { width: 96, height: 96 },
   brandTitle: { fontSize: 28, fontWeight: '800', color: '#0f766e', marginTop: 8 },
+  brandSub: { fontSize: 13, fontWeight: '600', color: '#64748b', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,

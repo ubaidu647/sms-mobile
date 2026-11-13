@@ -71,10 +71,8 @@ export function formatMonth(ym) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
 }
 
-export function formatMoney(n) {
-  const num = Number(n) || 0;
-  return `₨ ${num.toLocaleString()}`;
-}
+// formatMoney(amount, symbol): pass the school's symbol from useSchoolCurrency().
+export { formatMoney } from '../utils/money';
 
 export function titleCase(s) {
   if (!s) return '';

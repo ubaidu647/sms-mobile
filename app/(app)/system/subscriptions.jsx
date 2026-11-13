@@ -17,25 +17,37 @@ import {
   useCurrentSubscription,
   useSubscriptionHistory,
   useInvoiceSummary,
-  useRenewSubscription,
   useCancelSubscription,
+  useSchoolInvoices,
+  useRemoveAddon,
+  useMarkInvoicePaid,
 } from '../../../src/hooks/useSubscriptions';
 import {
   fmtMoney,
   fmtDate,
-  effectiveLimit,
   graceCutoff,
   platformList,
-  validateGraceDays,
   SUB_STATUS_PILL,
 } from '../../../src/constants/billing';
 import AssignSubscriptionModal from '../../../src/component/system/AssignSubscriptionModal';
 import ChangePlanModal from '../../../src/component/system/ChangePlanModal';
 import InvoiceModal from '../../../src/component/system/InvoiceModal';
 import ConfirmModal from '../../../src/component/system/ConfirmModal';
+import RenewSubscriptionModal from '../../../src/component/system/RenewSubscriptionModal';
+import QueryErrorState from '../../../src/component/QueryErrorState';
 import SubscriptionDetailModal from '../../../src/component/billing/SubscriptionDetailModal';
+import AddonModal from '../../../src/component/system/AddonModal';
+import AddonList, { addonText } from '../../../src/component/billing/AddonList';
+import LimitGrid from '../../../src/component/billing/LimitGrid';
+import StorageUsage from '../../../src/component/billing/StorageUsage';
+import { PriceLockBadge, priceLockText } from '../../../src/component/billing/PriceLock';
+import { addonModuleKeys, addonsWithInvoices } from '../../../src/utils/planAddons';
 import { useColors } from '../../../src/theme/useColors';
 import { COLORS } from '../../../src/theme/colors';
+import { describePlanFeatures } from '../../../src/utils/planFeatures';
+import { isPaymentOverdue } from '../../../src/utils/paymentDue';
+import { OverdueBadge, paymentWindowText } from '../../../src/component/billing/PaymentDueInfo';
+import { useTranslations } from '../../../src/i18n';
 
 function StatusPill({ status, C }) {
   const cfg = SUB_STATUS_PILL[status] || { bg: '#f3f4f6', fg: '#374151' };
@@ -48,6 +60,9 @@ function StatusPill({ status, C }) {
 
 export default function SubscriptionsScreen() {
   const C = useColors();
+  const t = useTranslations('subscription');
+  const tm = useTranslations('planModules');
+  const moduleLabel = (k) => tm(`modules.${k}`);
   const { user } = useUserStore();
   const allowed = isSuperAdmin(user?.role);
 
@@ -65,14 +80,38 @@ export default function SubscriptionsScreen() {
   const summary = useInvoiceSummary(schoolId);
   const dues = summary.data?.data ?? null;
 
-  const renew = useRenewSubscription({ onSuccess: () => setRenewOpen(false) });
   const cancel = useCancelSubscription({ onSuccess: () => setCancelOpen(false) });
+
+  // Add-ons, joined to their invoices to tell which can still be removed.
+  const hasAddons = (sub?.addons?.length ?? 0) > 0;
+  const invoices = useSchoolInvoices(schoolId, { enabled: hasAddons });
+  const addonRows = useMemo(
+    () => addonsWithInvoices(sub?.addons, invoices.data?.data),
+    [sub?.addons, invoices.data],
+  );
+  const [addonOpen, setAddonOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState(null);
+  const [removeError, setRemoveError] = useState('');
+  const [payingId, setPayingId] = useState(null);
+  const removeAddon = useRemoveAddon({ onSuccess: () => setRemoveTarget(null) });
+  const markPaid = useMarkInvoicePaid(schoolId, { onSuccess: () => setPayingId(null) });
+  const confirmRemove = () => {
+    setRemoveError('');
+    removeAddon.mutate(
+      { schoolId, addonId: removeTarget._id },
+      { onError: (err) => setRemoveError(err?.message || t('addons.removeFailed')) },
+    );
+  };
+  const payAddon = (a) => {
+    if (!a.invoice?._id) return;
+    setPayingId(a._id);
+    markPaid.mutate({ id: a.invoice._id }, { onError: () => setPayingId(null) });
+  };
 
   const [assignOpen, setAssignOpen] = useState(false);
   const [changeOpen, setChangeOpen] = useState(false);
   const [renewOpen, setRenewOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [renewGrace, setRenewGrace] = useState('');
   const [subTarget, setSubTarget] = useState(null);
   const [invoiceTarget, setInvoiceTarget] = useState(null);
 
@@ -103,7 +142,7 @@ export default function SubscriptionsScreen() {
         schoolId ? (
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => { current.refetch(); history.refetch(); summary.refetch(); }}
+            onRefresh={() => { current.refetch(); history.refetch(); summary.refetch(); if (hasAddons) invoices.refetch(); }}
             tintColor={COLORS.brand}
           />
         ) : undefined
@@ -167,10 +206,17 @@ export default function SubscriptionsScreen() {
                         {sub.packageSnapshot?.name ?? 'Subscription'}
                       </Text>
                       <StatusPill status={sub.status} C={C} />
+                      {isPaymentOverdue(sub) && <OverdueBadge />}
+                      <PriceLockBadge t={t} sub={sub} />
                     </View>
                     <Text style={[styles.sub, { color: C.muted }]}>
                       {fmtMoney(sub.packageSnapshot?.price)} · {sub.packageSnapshot?.durationInDays}d cycle
                     </Text>
+                    {!!sub.priceLock && (
+                      <Text style={[styles.subSmall, { color: '#6d28d9', fontWeight: '700' }]}>
+                        {priceLockText(t, sub)}
+                      </Text>
+                    )}
                     <Text style={[styles.subSmall, { color: C.muted }]}>
                       {fmtDate(sub.startDate)} → {fmtDate(sub.endDate)}
                     </Text>
@@ -178,32 +224,51 @@ export default function SubscriptionsScreen() {
                       Grace: {grace} {grace === 1 ? 'day' : 'days'}
                       {grace > 0 ? ` · blocked after ${fmtDate(graceCutoff(sub.endDate, grace))}` : ''}
                     </Text>
+                    <Text style={[styles.subSmall, { color: isPaymentOverdue(sub) ? '#b91c1c' : C.muted }]}>
+                      {t('payment.windowLabel')}: {paymentWindowText(t, sub)}
+                      {sub.paymentDueAt ? ` · ${t('payment.dueOn')}: ${fmtDate(sub.paymentDueAt)}` : ''}
+                    </Text>
 
-                    <View style={styles.limitGrid}>
-                      {[
-                        ['noOfStudents', 'Students'],
-                        ['noOfBranches', 'Branches'],
-                        ['noOfStaffs', 'Staff'],
-                        ['noOfSections', 'Sections'],
-                      ].map(([key, lbl]) => (
-                        <View key={key} style={[styles.limitCard, { backgroundColor: C.bg }]}>
-                          <Text style={[styles.limitValue, { color: C.text }]}>{effectiveLimit(sub, key) ?? '∞'}</Text>
-                          <Text style={[styles.limitLabel, { color: C.muted }]}>{lbl}</Text>
-                        </View>
-                      ))}
-                    </View>
+                    <LimitGrid sub={sub} C={C} style={{ marginTop: 10 }} />
+                    <StorageUsage storage={sub.storage} C={C} warn style={{ marginTop: 10 }} />
 
                     <View style={[styles.planMeta, { borderTopColor: C.border }]}>
                       <Text style={[styles.kv, { color: C.muted }]}>
                         Platforms: <Text style={{ color: C.text, textTransform: 'capitalize' }}>{platformList(sub.packageSnapshot?.platforms)}</Text>
                       </Text>
                       <Text style={[styles.kv, { color: C.muted, marginTop: 4 }]}>
-                        Features: <Text style={{ color: C.text }}>{sub.packageSnapshot?.features?.length ? sub.packageSnapshot.features.join(', ') : 'All features'}</Text>
+                        Modules: <Text style={{ color: C.text }}>{describePlanFeatures(sub.packageSnapshot?.features)}</Text>
                       </Text>
+                      {addonModuleKeys(sub).length > 0 && (
+                        <Text style={[styles.kv, { color: C.muted, marginTop: 4 }]}>
+                          {t('addons.modulesOpened', { modules: addonModuleKeys(sub).map(moduleLabel).join(', ') })}
+                        </Text>
+                      )}
                     </View>
                     {sub.customLimits && Object.keys(sub.customLimits).length > 0 && (
                       <Text style={[styles.warn, { color: '#b45309' }]}>This school has custom limit overrides applied.</Text>
                     )}
+
+                    <View style={[styles.planMeta, { borderTopColor: C.border, gap: 8 }]}>
+                      <View style={styles.addonHead}>
+                        <Text style={[styles.addonTitle, { color: C.text }]}>{t('addons.title')}</Text>
+                        <Pressable
+                          onPress={() => setAddonOpen(true)}
+                          hitSlop={6}
+                          style={({ pressed }) => [styles.addonBtn, pressed && { opacity: 0.85 }]}
+                        >
+                          <Feather name="plus" size={13} color="#fff" />
+                          <Text style={styles.addonBtnText}>{t('addons.add')}</Text>
+                        </Pressable>
+                      </View>
+                      <AddonList
+                        addons={addonRows}
+                        C={C}
+                        onRemove={(a) => { setRemoveError(''); setRemoveTarget(a); }}
+                        onMarkPaid={payAddon}
+                        busyId={payingId}
+                      />
+                    </View>
 
                     <View style={styles.actionRow}>
                       <Pressable onPress={() => setChangeOpen(true)} style={({ pressed }) => [styles.primaryAction, pressed && { opacity: 0.9 }]}>
@@ -211,7 +276,7 @@ export default function SubscriptionsScreen() {
                         <Text style={styles.primaryActionText}>Change</Text>
                       </Pressable>
                       <Pressable
-                        onPress={() => { setRenewGrace(sub?.gracePeriodInDays != null ? String(sub.gracePeriodInDays) : ''); setRenewOpen(true); }}
+                        onPress={() => setRenewOpen(true)}
                         style={({ pressed }) => [styles.ghostAction, { borderColor: C.border, backgroundColor: C.bg }, pressed && { opacity: 0.85 }]}
                       >
                         <Feather name="rotate-cw" size={14} color={C.text} />
@@ -223,6 +288,13 @@ export default function SubscriptionsScreen() {
                       </Pressable>
                     </View>
                   </>
+                ) : current.isError ? (
+                  <QueryErrorState
+                    error={current.error}
+                    fallback="Could not load the subscription"
+                    onRetry={() => current.refetch()}
+                    style={styles.cardError}
+                  />
                 ) : (
                   <View style={{ gap: 12, alignItems: 'center', paddingVertical: 8 }}>
                     <Feather name="credit-card" size={32} color={C.mutedSoft} />
@@ -244,12 +316,21 @@ export default function SubscriptionsScreen() {
                   <Feather name="file-text" size={18} color={COLORS.brand} />
                   <Text style={[styles.sectionTitle, { color: C.text }]}>Billing & Dues</Text>
                 </View>
-                <View style={styles.duesGrid}>
-                  <DueStat value={fmtMoney(dues?.totalDue ?? 0)} label="Outstanding dues" bg="#fee2e2" fg="#991b1b" />
-                  <DueStat value={fmtMoney(dues?.totalPaid ?? 0)} label="Total paid" bg="#dcfce7" fg="#166534" />
-                  <DueStat value={`${dues?.unpaidCount ?? 0}`} label="Unpaid invoices" bg={C.bg} fg={C.text} />
-                  <DueStat value={`${dues?.invoiceCount ?? 0}`} label="Total invoices" bg={C.bg} fg={C.text} />
-                </View>
+                {summary.isError && !dues ? (
+                  <QueryErrorState
+                    error={summary.error}
+                    fallback="Could not load billing"
+                    onRetry={() => summary.refetch()}
+                    style={styles.cardError}
+                  />
+                ) : (
+                  <View style={styles.duesGrid}>
+                    <DueStat value={fmtMoney(dues?.totalDue ?? 0)} label="Outstanding dues" bg="#fee2e2" fg="#991b1b" />
+                    <DueStat value={fmtMoney(dues?.totalPaid ?? 0)} label="Total paid" bg="#dcfce7" fg="#166534" />
+                    <DueStat value={`${dues?.unpaidCount ?? 0}`} label="Unpaid invoices" bg={C.bg} fg={C.text} />
+                    <DueStat value={`${dues?.invoiceCount ?? 0}`} label="Total invoices" bg={C.bg} fg={C.text} />
+                  </View>
+                )}
                 <Text style={[styles.hint, { color: C.mutedSoft }]}>
                   Open a plan below and choose “View Invoice” to see line items or mark it paid.
                 </Text>
@@ -269,6 +350,12 @@ export default function SubscriptionsScreen() {
                       <Text style={[styles.histMeta, { color: C.muted }]} numberOfLines={1}>
                         {fmtMoney(row.packageSnapshot?.price)} · {fmtDate(row.startDate)} → {fmtDate(row.endDate)}
                       </Text>
+                      {!!row.paymentDueAt && (
+                        <Text style={[styles.histMeta, { color: isPaymentOverdue(row) ? '#b91c1c' : C.muted }]} numberOfLines={1}>
+                          {t('payment.dueOn')}: {fmtDate(row.paymentDueAt)}
+                        </Text>
+                      )}
+                      {isPaymentOverdue(row) && <View style={{ marginTop: 4, alignSelf: 'flex-start' }}><OverdueBadge /></View>}
                     </View>
                     <StatusPill status={row.status} C={C} />
                     <View style={styles.histActions}>
@@ -290,34 +377,19 @@ export default function SubscriptionsScreen() {
       {/* Modals */}
       <AssignSubscriptionModal open={assignOpen} onClose={() => setAssignOpen(false)} schoolId={schoolId} schoolName={selectedSchool?.name} />
       <ChangePlanModal open={changeOpen} onClose={() => setChangeOpen(false)} schoolId={schoolId} schoolName={selectedSchool?.name} current={sub} />
+      <RenewSubscriptionModal open={renewOpen} onClose={() => setRenewOpen(false)} schoolId={schoolId} schoolName={selectedSchool?.name} current={sub} />
+      <AddonModal open={addonOpen} onClose={() => setAddonOpen(false)} schoolId={schoolId} schoolName={selectedSchool?.name} current={sub} />
       <ConfirmModal
-        open={renewOpen}
-        title="Renew Subscription"
-        message={sub ? `Renew "${sub.packageSnapshot?.name}" for ${selectedSchool?.name}? This starts a fresh ${sub.packageSnapshot?.durationInDays}-day cycle at current pricing.` : ''}
-        confirmLabel="Renew"
-        confirmTone="primary"
-        loading={renew.isPending}
-        onClose={() => setRenewOpen(false)}
-        onConfirm={() => {
-          const err = validateGraceDays(renewGrace);
-          if (err) { return; }
-          const payload = { schoolId };
-          if (renewGrace !== '' && renewGrace != null) payload.gracePeriodInDays = Number(renewGrace);
-          renew.mutate(payload);
-        }}
+        open={!!removeTarget}
+        title={t('addons.removeTitle')}
+        message={removeTarget ? t('addons.removeMessage', { label: addonText(t, removeTarget, moduleLabel) }) : ''}
+        confirmLabel={t('addons.remove')}
+        confirmTone="danger"
+        loading={removeAddon.isPending}
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={confirmRemove}
       >
-        <View style={{ gap: 6, marginTop: 4 }}>
-          <Text style={[styles.label, { color: C.muted }]}>GRACE PERIOD (DAYS AFTER EXPIRY)</Text>
-          <TextInput
-            value={renewGrace}
-            onChangeText={setRenewGrace}
-            placeholder="0"
-            placeholderTextColor={C.mutedSoft}
-            keyboardType="number-pad"
-            style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]}
-          />
-          <Text style={[styles.hint, { color: C.mutedSoft }]}>Leave unchanged to keep the current grace period.</Text>
-        </View>
+        {!!removeError && <Text style={styles.removeError}>{removeError}</Text>}
       </ConfirmModal>
       <ConfirmModal
         open={cancelOpen}
@@ -363,22 +435,23 @@ const styles = StyleSheet.create({
   changeLink: { fontSize: 13, fontWeight: '800' },
 
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 6 },
-  planTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  planTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   planName: { fontSize: 18, fontWeight: '800', flexShrink: 1 },
 
   pill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
   pillText: { fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
 
-  limitGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  limitCard: { flexBasis: '22%', flexGrow: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  limitValue: { fontSize: 18, fontWeight: '800' },
-  limitLabel: { fontSize: 11, marginTop: 2 },
-
   planMeta: { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   kv: { fontSize: 13, fontWeight: '600' },
   warn: { fontSize: 12, fontWeight: '600', marginTop: 8 },
+  addonHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  addonTitle: { fontSize: 14, fontWeight: '800' },
+  addonBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 30, paddingHorizontal: 10, borderRadius: 8, backgroundColor: COLORS.brand },
+  addonBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  removeError: { fontSize: 12, fontWeight: '600', color: '#b91c1c', marginTop: 10 },
 
   emptyTitle: { fontSize: 16, fontWeight: '800' },
+  cardError: { flex: 0, padding: 8 },
 
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
   primaryAction: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 10, backgroundColor: COLORS.brand },
@@ -403,7 +476,4 @@ const styles = StyleSheet.create({
   histMeta: { fontSize: 11, marginTop: 2 },
   histActions: { flexDirection: 'row', gap: 6 },
   histIconBtn: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-
-  label: { fontSize: 10, letterSpacing: 1.1, fontWeight: '700' },
-  input: { height: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 14 },
 });

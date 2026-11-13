@@ -29,8 +29,10 @@ import { COLORS } from '../../theme/colors';
 import GenerateSectionModal from './GenerateSectionModal';
 import GenerateStudentModal from './GenerateStudentModal';
 import StudentPickerModal from './StudentPickerModal';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 function VoucherCard({ v, onTap, C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const cfg = VOUCHER_STATUS_PILL[v.status] || VOUCHER_STATUS_PILL.unpaid;
   return (
     <Pressable
@@ -79,13 +81,13 @@ function VoucherCard({ v, onTap, C }) {
         <View style={styles.amountBlock}>
           <Text style={[styles.amountLabel, { color: C.mutedSoft }]}>TOTAL</Text>
           <Text style={[styles.amountValue, { color: C.text }]} numberOfLines={1}>
-            {formatMoney(v.totalAmount)}
+            {formatMoney(v.totalAmount, currencySymbol)}
           </Text>
         </View>
         <View style={styles.amountBlock}>
           <Text style={[styles.amountLabel, { color: C.mutedSoft }]}>PAID</Text>
           <Text style={[styles.amountValue, { color: '#166534' }]} numberOfLines={1}>
-            {formatMoney(v.paidAmount)}
+            {formatMoney(v.paidAmount, currencySymbol)}
           </Text>
         </View>
         <View style={styles.amountBlock}>
@@ -94,7 +96,7 @@ function VoucherCard({ v, onTap, C }) {
             style={[styles.amountValue, { color: v.balanceAmount > 0 ? '#991b1b' : C.text }]}
             numberOfLines={1}
           >
-            {formatMoney(v.balanceAmount)}
+            {formatMoney(v.balanceAmount, currencySymbol)}
           </Text>
         </View>
       </View>
@@ -105,7 +107,7 @@ function VoucherCard({ v, onTap, C }) {
           <View style={[styles.lateFeePill, { backgroundColor: '#fee2e2' }]}>
             <Feather name="alert-octagon" size={10} color="#991b1b" />
             <Text style={[styles.lateFeeText, { color: '#991b1b' }]}>
-              + {formatMoney(v.lateFee)}
+              + {formatMoney(v.lateFee, currencySymbol)}
             </Text>
           </View>
         )}

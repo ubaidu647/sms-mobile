@@ -242,6 +242,7 @@ export function useMarkAnnouncementRead() {
           })),
         };
       });
+      queryClient.invalidateQueries({ queryKey: ['announcement-detail', res.id] });
     },
   });
 }
@@ -266,6 +267,7 @@ export function useAcknowledgeAnnouncement() {
           })),
         };
       });
+      queryClient.invalidateQueries({ queryKey: ['announcement-detail', res.id] });
       Toast.show({ type: 'success', text1: 'Acknowledged' });
     },
     onError: (err) => {

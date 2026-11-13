@@ -31,6 +31,7 @@ import LeaveRequestCard from '../../src/component/leave/LeaveRequestCard';
 import LeaveDecisionModal from '../../src/component/leave/LeaveDecisionModal';
 import LeaveFormModal from '../../src/component/leave/LeaveFormModal';
 import ReportPager from '../../src/component/ReportPager';
+import PlanFeatureGate from '../../src/component/PlanFeatureGate';
 
 const PAGE_SIZE = 20;
 
@@ -63,7 +64,7 @@ function ChipRow({ options, value, onChange, C }) {
   );
 }
 
-export default function LeaveScreen() {
+function LeaveScreen() {
   const C = useColors();
   const { user } = useUserStore();
 
@@ -337,3 +338,12 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 13, textAlign: 'center' },
 });
+
+// The plan may not include this module: show "Upgrade required" instead.
+export default function LeaveScreenRoute() {
+  return (
+    <PlanFeatureGate feature="leave">
+      <LeaveScreen />
+    </PlanFeatureGate>
+  );
+}

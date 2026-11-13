@@ -121,7 +121,7 @@ export default function SectionForm({
               : section?.classTeacher) ||
             section?.classTeacherInfo?._id ||
             '',
-          status: section?.status || (section?.isActive ? 'active' : 'inactive'),
+          status: section?.isActive === false ? 'inactive' : 'active',
         };
 
   const {

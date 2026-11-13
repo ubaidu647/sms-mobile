@@ -18,6 +18,8 @@ import {
 } from '../../constants/staffAttendance';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
+import { formatMoney } from '../../utils/money';
 
 function pctColor(pct) {
   if (pct == null) return { bg: '#f3f4f6', fg: '#374151' };
@@ -37,6 +39,7 @@ function StatChip({ label, value, color, bg }) {
 }
 
 export default function MonthlySummaryPanel() {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { user } = useUserStore();
 
@@ -165,7 +168,7 @@ export default function MonthlySummaryPanel() {
                   <View style={styles.payCell}>
                     <Text style={[styles.payLabel, { color: C.mutedSoft }]}>SALARY</Text>
                     <Text style={[styles.payValue, { color: C.text }]} numberOfLines={1}>
-                      {s.salary}
+                      {formatMoney(s.salary, currencySymbol)}
                     </Text>
                   </View>
                 )}

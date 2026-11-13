@@ -26,3 +26,11 @@ export const missingPapersReason = (summary) => {
     ? 'Failed: 1 required paper has no result'
     : `Failed: ${missing} required papers have no result`;
 };
+
+// Result-card class and section: the exam's class and the section the marks
+// were recorded in (`examClass` / `examSection`). An older API without them
+// falls back to where the student sits today.
+export const resultCardPlacement = (student) => ({
+  className: (student?.examClass ?? student?.class)?.name || '',
+  sectionName: (student?.examSection ?? student?.section)?.name || '',
+});

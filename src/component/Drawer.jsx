@@ -3,7 +3,6 @@ import {
   Animated,
   Dimensions,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,9 @@ import { COLORS } from '../theme/colors';
 import { useIsDark } from '../theme/useColors';
 import { canSee, hasAnyAction, isSuperAdmin } from '../utils/permissions';
 import { useTranslations } from '../i18n';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import { navItemState } from '../utils/planFeatures';
+import ToastModal from './ToastModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DRAWER_W = Math.min(300, SCREEN_W * 0.82);
@@ -39,6 +41,9 @@ const SYSTEM_MENU = [
 // Each predicate matches the RBAC the destination screen uses to gate itself, so
 // a restricted user never sees a menu that dead-ends on a "No access" screen.
 // Items with no `visible` are always shown (e.g. Dashboard, the home tab).
+// `feature` names the plan add-on a menu belongs to (utils/planFeatures.js).
+// On top of the permission check, a module the school's plan lacks is hidden
+// or shown locked, as the school's `lockedModuleDisplay` setting says.
 const SCHOOL_MENU = [
   { label: 'Dashboard', icon: 'home', path: '/(app)/dashboard' },
   { label: 'Branches', tKey: 'branches', icon: 'git-branch', path: '/(app)/branches', visible: (r) => canSee(r, 'view-branch') },
@@ -48,14 +53,15 @@ const SCHOOL_MENU = [
   { label: 'Subjects', tKey: 'subjects', icon: 'book-open', path: '/(app)/subjects', visible: (r) => canSee(r, 'view-subject') },
   { label: 'Students', tKey: 'students', icon: 'user', path: '/(app)/students', visible: (r) => canSee(r, 'view-student') },
   { label: 'Attendance', tKey: 'attendance', icon: 'check-square', path: '/(app)/attendance', visible: (r) => canSee(r, 'view-attendance') },
-  { label: 'Staff Attendance', tKey: 'staffAttendance', icon: 'user-check', path: '/(app)/staff-attendance', visible: (r) => canSee(r, 'view-staff-attendance') },
-  { label: 'Leave', icon: 'calendar', path: '/(app)/leave', visible: (r) => canSee(r, 'view-leave') || canSee(r, 'approve-leave') },
-  { label: 'My Leave', icon: 'sunrise', path: '/(app)/my-leave', visible: (r) => hasAnyAction(r, ['apply-own-leave']) },
+  { label: 'Staff Attendance', tKey: 'staffAttendance', icon: 'user-check', path: '/(app)/staff-attendance', feature: 'staff-attendance', visible: (r) => canSee(r, 'view-staff-attendance') },
+  { label: 'Leave', icon: 'calendar', path: '/(app)/leave', feature: 'leave', visible: (r) => canSee(r, 'view-leave') || canSee(r, 'approve-leave') },
+  { label: 'My Leave', icon: 'sunrise', path: '/(app)/my-leave', feature: 'leave', visible: (r) => hasAnyAction(r, ['apply-own-leave']) },
   {
     label: 'Staff Salary',
     tKey: 'staffSalary',
     icon: 'dollar-sign',
     path: '/(app)/staff-salary',
+    feature: 'staff-salary',
     // Parent of the salary tabs (dashboard/structures/payslips/policy).
     visible: (r) =>
       canSee(r, 'view-payslip') ||
@@ -72,6 +78,7 @@ const SCHOOL_MENU = [
     tKey: 'transport',
     icon: 'truck',
     path: '/(app)/transport',
+    feature: 'transport',
     // Parent of the transport tabs (vehicles/routes/assignments).
     visible: (r) =>
       canSee(r, 'view-vehicle') ||
@@ -101,7 +108,13 @@ export default function Drawer({ open, onClose }) {
   const isDark = useIsDark();
   const drawerBg = isDark ? '#0f172a' : COLORS.brand;
   const t = useTranslations('sidebar');
+  const tPlan = useTranslations('planModules');
+  const { features, display } = usePlanFeatures();
   const menu = isSuperAdmin(user?.role) ? SYSTEM_MENU : SCHOOL_MENU;
+  const items = menu
+    .filter((item) => !item.visible || item.visible(user?.role))
+    .map((item) => ({ ...item, plan: navItemState(features, item.feature, display) }))
+    .filter((item) => item.plan !== 'hidden');
 
   useEffect(() => {
     Animated.parallel([
@@ -119,6 +132,17 @@ export default function Drawer({ open, onClose }) {
   }, [open]);
 
   const handleNav = (item) => {
+    // Not in the plan: explain, stay put (the drawer stays open; ToastModal
+    // shows the toast above it).
+    if (item.plan === 'locked') {
+      Toast.show({
+        type: 'info',
+        text1: tPlan('lockedTitle'),
+        text2: tPlan('lockedMessage', { module: tPlan(`modules.${item.feature}`) }),
+        visibilityTime: 5000,
+      });
+      return;
+    }
     if (!item.path) {
       Toast.show({
         type: 'info',
@@ -136,7 +160,7 @@ export default function Drawer({ open, onClose }) {
     typeof user?.role === 'string' ? user.role : user?.role?.name ?? 'Member';
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       transparent
       animationType="none"
@@ -163,7 +187,7 @@ export default function Drawer({ open, onClose }) {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.brandTitle}>nodeCampus</Text>
+              <Text style={styles.brandTitle}>Mizenzo</Text>
               <Text style={styles.brandSub}>School Management</Text>
             </View>
             <Pressable
@@ -180,15 +204,20 @@ export default function Drawer({ open, onClose }) {
             contentContainerStyle={{ paddingVertical: 8 }}
             showsVerticalScrollIndicator={false}
           >
-            {menu.filter((item) => !item.visible || item.visible(user?.role)).map((item) => {
-              const active = item.path && pathname?.startsWith(item.path.replace('/(app)', ''));
+            {items.map((item) => {
+              const locked = item.plan === 'locked';
+              const active =
+                !locked && item.path && pathname?.startsWith(item.path.replace('/(app)', ''));
               return (
                 <Pressable
                   key={item.label}
                   onPress={() => handleNav(item)}
+                  accessibilityState={locked ? { disabled: true } : undefined}
+                  accessibilityHint={locked ? tPlan('lockedTitle') : undefined}
                   style={({ pressed }) => [
                     styles.menuRow,
                     active && styles.menuRowActive,
+                    locked && styles.menuRowLocked,
                     pressed && { backgroundColor: 'rgba(255,255,255,0.08)' },
                   ]}
                 >
@@ -200,8 +229,10 @@ export default function Drawer({ open, onClose }) {
                   <Text style={[styles.menuLabel, active && styles.menuLabelActive]}>
                     {item.tKey ? t(item.tKey) : item.label}
                   </Text>
-                  {!item.path && (
-                    <Text style={styles.menuBadge}>Soon</Text>
+                  {locked ? (
+                    <Feather name="lock" size={14} color="rgba(255,255,255,0.85)" />
+                  ) : (
+                    !item.path && <Text style={styles.menuBadge}>Soon</Text>
                   )}
                 </Pressable>
               );
@@ -237,7 +268,7 @@ export default function Drawer({ open, onClose }) {
           </View>
         </SafeAreaView>
       </Animated.View>
-    </Modal>
+    </ToastModal>
   );
 }
 
@@ -290,6 +321,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   menuRowActive: { backgroundColor: 'rgba(255,255,255,0.12)' },
+  menuRowLocked: { opacity: 0.5 },
   menuLabel: { color: 'rgba(255,255,255,0.92)', fontSize: 14, fontWeight: '600', flex: 1 },
   menuLabelActive: { color: COLORS.accent, fontWeight: '800' },
   menuBadge: {

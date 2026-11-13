@@ -1,28 +1,66 @@
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from './KeyboardAvoidingView';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import StudentForm from './StudentForm';
-import { useUpdateStudent } from '../hooks/useStudents';
+import QueryErrorState from './QueryErrorState';
+import { useStudentDetail, useUpdateStudent } from '../hooks/useStudents';
 import { useColors } from '../theme/useColors';
+import { COLORS } from '../theme/colors';
+import { freshRecord } from '../utils/freshRecord';
 
-export default function EditStudentModal({ open, student, onClose }) {
-  const C = useColors();
+// Rendered inside the Modal, which unmounts its children on close: every open
+// gets a new query observer, and so its own refetch. Above the Modal it would
+// live as long as the detail screen does, and count as fetched after one load.
+function EditStudentContent({ student, onClose }) {
+  // `student` may be a list row, which carries a few fields: the form must open
+  // from the full record, or saving would write its blanks over the real values.
+  // Fresh too: the form saves every field, isActive included, and a cached copy
+  // would undo a block made since.
+  const detail = useStudentDetail(student._id, { staleTime: 0 });
+  const record = freshRecord(detail);
   const { mutate, isPending } = useUpdateStudent({
-    studentId: student?._id,
+    studentId: student._id,
     onSuccess: () => onClose(),
   });
 
+  if (record) {
+    return (
+      <StudentForm
+        mode="edit"
+        student={record}
+        onSubmit={(fd) => mutate(fd)}
+        isPending={isPending}
+        submitLabel="Save Changes"
+      />
+    );
+  }
+  if (detail.isError && !detail.isFetching) {
+    return (
+      <QueryErrorState
+        error={detail.error}
+        fallback="Could not load this student"
+        onRetry={detail.refetch}
+        style={{ flex: 0 }}
+      />
+    );
+  }
+  return <ActivityIndicator size="large" color={COLORS.brand} style={{ marginTop: 40 }} />;
+}
+
+export default function EditStudentModal({ open, student, onClose }) {
+  const C = useColors();
+
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -51,7 +89,6 @@ export default function EditStudentModal({ open, student, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -59,19 +96,11 @@ export default function EditStudentModal({ open, student, onClose }) {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {!!student && (
-              <StudentForm
-                mode="edit"
-                student={student}
-                onSubmit={(fd) => mutate(fd)}
-                isPending={isPending}
-                submitLabel="Save Changes"
-              />
-            )}
+            {student ? <EditStudentContent student={student} onClose={onClose} /> : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

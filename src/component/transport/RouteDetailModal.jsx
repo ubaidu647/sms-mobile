@@ -14,6 +14,7 @@ import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import QueryErrorState from '../QueryErrorState';
 import { formatMoney } from '../../constants/fee';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const PIN_COLORS = [
   '#10b981',
@@ -27,6 +28,7 @@ const PIN_COLORS = [
 ];
 
 export default function RouteDetailModal({ open, routeId, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const C = useColors();
   const { data: route, isLoading, isError, error } = useRouteDetail({ id: routeId, enabled: open && !!routeId });
 
@@ -129,7 +131,7 @@ export default function RouteDetailModal({ open, routeId, onClose }) {
               <View style={styles.kv}>
                 <Text style={[styles.kvKey, { color: C.muted }]}>Base Fee</Text>
                 <Text style={[styles.kvVal, { color: COLORS.brand }]}>
-                  {formatMoney(route.baseFee)}
+                  {formatMoney(route.baseFee, currencySymbol)}
                 </Text>
               </View>
               {route.distanceKm != null && (
@@ -195,7 +197,7 @@ export default function RouteDetailModal({ open, routeId, onClose }) {
                           <Feather name="navigation" size={11} color={C.mutedSoft} />
                           <Text style={[styles.stopMeta, { color: C.muted }]}>
                             {distance} km from start
-                            {s.fee != null ? `  ·  ${formatMoney(s.fee)} fee` : ''}
+                            {s.fee != null ? `  ·  ${formatMoney(s.fee, currencySymbol)} fee` : ''}
                           </Text>
                         </View>
                         {!!s.landmark && (

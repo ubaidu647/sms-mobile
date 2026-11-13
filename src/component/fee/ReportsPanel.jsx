@@ -32,10 +32,12 @@ import { monthsAgoYMD } from '../../utils/localDate';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 import ReportPager from '../ReportPager';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const REPORT_PAGE_SIZE = 100;
 
 function CollectionReport({ C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const { user } = useUserStore();
   const isAdmin = !!user?.role?.isPredefined;
   const isOrgLevel = isAdmin || !!user?.role?.actions?.includes('view-all-branch-payment');
@@ -156,7 +158,7 @@ function CollectionReport({ C }) {
             <View>
               <Text style={[styles.kpiLabel, { color: COLORS.brand }]}>GRAND TOTAL</Text>
               <Text style={[styles.kpiValue, { color: COLORS.brand }]}>
-                {formatMoney(report.grandTotal)}
+                {formatMoney(report.grandTotal, currencySymbol)}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -185,7 +187,7 @@ function CollectionReport({ C }) {
                       {m.count} receipt{m.count === 1 ? '' : 's'}
                     </Text>
                     <Text style={[styles.methodAmount, { color: C.text }]}>
-                      {formatMoney(m.total)}
+                      {formatMoney(m.total, currencySymbol)}
                     </Text>
                   </View>
                 );
@@ -199,6 +201,7 @@ function CollectionReport({ C }) {
 }
 
 function OutstandingReport({ C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const router = useRouter();
   const { user } = useUserStore();
   const isAdmin = !!user?.role?.isPredefined;
@@ -451,7 +454,7 @@ function OutstandingReport({ C }) {
             <View>
               <Text style={[styles.kpiLabel, { color: '#991b1b' }]}>OUTSTANDING</Text>
               <Text style={[styles.kpiValue, { color: '#991b1b' }]}>
-                {formatMoney(report?.grandTotal)}
+                {formatMoney(report?.grandTotal, currencySymbol)}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -496,7 +499,7 @@ function OutstandingReport({ C }) {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[styles.outAmount, { color: '#991b1b' }]}>
-                  {formatMoney(r.outstandingTotal)}
+                  {formatMoney(r.outstandingTotal, currencySymbol)}
                 </Text>
                 <Feather name="chevron-right" size={16} color={C.mutedSoft} />
               </View>
@@ -509,6 +512,7 @@ function OutstandingReport({ C }) {
 }
 
 function DefaultersReport({ C }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const router = useRouter();
   const { user } = useUserStore();
   const canView = hasAnyAction(user?.role, [
@@ -671,7 +675,7 @@ function DefaultersReport({ C }) {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[styles.outAmount, { color: '#991b1b' }]}>
-                  {formatMoney(r.closingBalance)}
+                  {formatMoney(r.closingBalance, currencySymbol)}
                 </Text>
                 <Feather name="chevron-right" size={16} color={C.mutedSoft} />
               </View>

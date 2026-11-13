@@ -24,7 +24,7 @@ export function useStudentList({ page, limit, filters, branchId, enabled = true 
   });
 }
 
-export function useStudentDetail(studentId) {
+export function useStudentDetail(studentId, { staleTime = 60_000 } = {}) {
   return useQuery({
     queryKey: ['student-detail', studentId],
     queryFn: async () => {
@@ -32,7 +32,7 @@ export function useStudentDetail(studentId) {
       return data;
     },
     enabled: !!studentId,
-    staleTime: 60_000,
+    staleTime,
   });
 }
 

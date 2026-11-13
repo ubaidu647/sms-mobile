@@ -14,6 +14,7 @@ import {
   useSectionSummary,
   useSectionsForExam,
 } from '../../../../../src/hooks/useExams';
+import QueryErrorState from '../../../../../src/component/QueryErrorState';
 import { useColors } from '../../../../../src/theme/useColors';
 import { COLORS } from '../../../../../src/theme/colors';
 import { formatDate, titleCase } from '../../../../../src/constants/exam';
@@ -43,7 +44,7 @@ export default function SectionSummaryPage() {
   const { data: sectionData } = useSectionsForExam({ classId, enabled: !!classId });
   const sections = sectionData?.data || [];
 
-  const { data: summary, isFetching } = useSectionSummary({
+  const { data: summary, isFetching, isError, error, refetch } = useSectionSummary({
     examId,
     sectionId,
     enabled: !!sectionId,
@@ -124,6 +125,15 @@ export default function SectionSummaryPage() {
         ) : isFetching && !summary ? (
           <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
             <ActivityIndicator size="large" color={COLORS.brand} />
+          </View>
+        ) : isError && !summary ? (
+          <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>
+            <QueryErrorState
+              error={error}
+              fallback="Could not load this summary"
+              onRetry={refetch}
+              style={{ flex: 0 }}
+            />
           </View>
         ) : !students.length ? (
           <View style={[styles.empty, { backgroundColor: C.card, borderColor: C.border }]}>

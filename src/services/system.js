@@ -124,9 +124,45 @@ export const changePackage = async (payload) => {
 };
 
 // Renew same package, fresh cycle, re-snapshots current catalog pricing.
+// `keepAddons` (default true) carries the add-ons over, billed for the full period.
 export const renewSubscription = async (payload) => {
   try {
     const res = await apiClient.post('/subscription/renew', payload);
+    return unwrap(res);
+  } catch (error) {
+    normalizeError(error);
+  }
+};
+
+/* -------------------------------- Add-ons ------------------------------- */
+// Extra units of a plan limit bought mid-period, billed for the days left on
+// an `addon` invoice. body: { schoolId, resource, quantity, unitPrice? }.
+
+// Price without buying. 400 (with a message) when no unit price is listed and
+// none is given, or the plan period has ended.
+export const quoteAddon = async (payload) => {
+  try {
+    const res = await apiClient.post('/subscription/addon/quote', payload);
+    return unwrap(res); // data: { unitPrice, amount, remainingDays, currentLimit, newLimit, ... }
+  } catch (error) {
+    normalizeError(error);
+  }
+};
+
+// Buy: raises the limit at once. body may add paymentInfo.
+export const purchaseAddon = async (payload) => {
+  try {
+    const res = await apiClient.post('/subscription/addon', payload);
+    return unwrap(res); // data: { addon, quote, invoiceId, amountDue }
+  } catch (error) {
+    normalizeError(error);
+  }
+};
+
+// Remove an add-on whose invoice is unpaid (voids it). 400 once paid.
+export const removeAddon = async ({ schoolId, addonId }) => {
+  try {
+    const res = await apiClient.post('/subscription/addon/remove', { schoolId, addonId });
     return unwrap(res);
   } catch (error) {
     normalizeError(error);

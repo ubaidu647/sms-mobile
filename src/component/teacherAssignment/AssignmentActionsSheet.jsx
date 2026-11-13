@@ -2,12 +2,12 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useDeleteAssignment } from '../../hooks/useTeacherAssignments';
@@ -49,7 +49,7 @@ export default function AssignmentActionsSheet({
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <ToastModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
           style={[styles.sheet, { backgroundColor: C.card }]}
@@ -95,7 +95,7 @@ export default function AssignmentActionsSheet({
           </SafeAreaView>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ToastModal>
   );
 }
 

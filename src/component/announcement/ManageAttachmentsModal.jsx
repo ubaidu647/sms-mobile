@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -71,7 +71,7 @@ export default function ManageAttachmentsModal({ open, announcement, onClose }) 
   if (!announcement) return null;
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -177,7 +177,7 @@ export default function ManageAttachmentsModal({ open, announcement, onClose }) 
           />
         )}
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

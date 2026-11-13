@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -30,6 +29,7 @@ import {
 } from '../../constants/fee';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { useSchoolCurrency } from '../../hooks/useSchoolCurrency';
 
 const blankComponent = () => ({
   name: '',
@@ -42,6 +42,7 @@ const blankComponent = () => ({
 });
 
 export default function FeeStructureFormModal({ open, structure, onClose }) {
+  const { symbol: currencySymbol } = useSchoolCurrency();
   const isEdit = !!structure;
   const C = useColors();
   const { user } = useUserStore();
@@ -190,7 +191,7 @@ export default function FeeStructureFormModal({ open, structure, onClose }) {
   };
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -223,7 +224,6 @@ export default function FeeStructureFormModal({ open, structure, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -528,19 +528,19 @@ export default function FeeStructureFormModal({ open, structure, onClose }) {
             <View style={[styles.totalsCard, { borderColor: '#99f6e4', backgroundColor: '#f0fdfa' }]}>
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>Monthly</Text>
-                <Text style={styles.totalsValue}>{formatMoney(totals.monthly)}</Text>
+                <Text style={styles.totalsValue}>{formatMoney(totals.monthly, currencySymbol)}</Text>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>One-time</Text>
-                <Text style={styles.totalsValue}>{formatMoney(totals.oneTime)}</Text>
+                <Text style={styles.totalsValue}>{formatMoney(totals.oneTime, currencySymbol)}</Text>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>Annual</Text>
-                <Text style={styles.totalsValue}>{formatMoney(totals.annual)}</Text>
+                <Text style={styles.totalsValue}>{formatMoney(totals.annual, currencySymbol)}</Text>
               </View>
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>Quarterly</Text>
-                <Text style={styles.totalsValue}>{formatMoney(totals.quarterly)}</Text>
+                <Text style={styles.totalsValue}>{formatMoney(totals.quarterly, currencySymbol)}</Text>
               </View>
             </View>
 
@@ -566,7 +566,7 @@ export default function FeeStructureFormModal({ open, structure, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

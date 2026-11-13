@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -19,9 +18,14 @@ import { useAssignSubscription } from '../../hooks/useSubscriptions';
 import { fmtMoney, validateGraceDays, LIMIT_KEYS } from '../../constants/billing';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
+import { paymentDueFields } from '../../utils/paymentDue';
+import { useTranslations } from '../../i18n';
+import PaymentDueField from './PaymentDueField';
+import LaunchOfferSwitch, { launchOfferField } from './LaunchOfferSwitch';
 
 export default function AssignSubscriptionModal({ open, onClose, schoolId, schoolName }) {
   const C = useColors();
+  const t = useTranslations('subscription');
   const { data: pkgData } = usePackages({ limit: 100, filters: { isActive: true }, enabled: open });
   const packages = pkgData?.data ?? [];
   const assign = useAssignSubscription({ onSuccess: () => onClose() });
@@ -32,6 +36,9 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
   const [method, setMethod] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [grace, setGrace] = useState('0');
+  const [blockUnpaid, setBlockUnpaid] = useState(true);
+  const [dueDays, setDueDays] = useState('');
+  const [applyOffer, setApplyOffer] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -41,6 +48,9 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
       setMethod('');
       setTransactionId('');
       setGrace('0');
+      setBlockUnpaid(true);
+      setDueDays('');
+      setApplyOffer(true);
     }
   }, [open]);
 
@@ -50,6 +60,8 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
     if (!packageId) return Toast.show({ type: 'error', text1: 'Please choose a package' });
     const graceErr = validateGraceDays(grace);
     if (graceErr) return Toast.show({ type: 'error', text1: graceErr });
+    const due = paymentDueFields({ enabled: blockUnpaid, raw: dueDays });
+    if (due.error) return Toast.show({ type: 'error', text1: t('payment.errRange') });
 
     const payload = { schoolId, packageId };
     if (useCustom) {
@@ -64,11 +76,12 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
       payload.paymentInfo = { method: method || undefined, transactionId: transactionId || undefined };
     }
     if (grace !== '' && grace != null) payload.gracePeriodInDays = Number(grace);
+    Object.assign(payload, due.fields, launchOfferField(selected, applyOffer));
     assign.mutate(payload);
   };
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <ToastModal visible={open} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.safe, { backgroundColor: C.card }]} edges={['top', 'bottom']}>
         <View style={[styles.header, { borderBottomColor: C.border }]}>
           <View style={{ flex: 1 }}>
@@ -84,7 +97,7 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
           </Pressable>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={[styles.label, { color: C.muted }]}>PACKAGE *</Text>
             {packages.length === 0 ? (
@@ -122,6 +135,8 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
                 </Text>
               </View>
             )}
+
+            <LaunchOfferSwitch pkg={selected} value={applyOffer} onChange={setApplyOffer} C={C} />
 
             <Pressable
               onPress={() => setUseCustom((v) => !v)}
@@ -165,6 +180,14 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
               <TextInput value={grace} onChangeText={setGrace} placeholder="0" placeholderTextColor={C.mutedSoft} keyboardType="number-pad" style={[styles.input, { color: C.text, borderColor: C.border, backgroundColor: C.bg }]} />
             </View>
 
+            <PaymentDueField
+              enabled={blockUnpaid}
+              onEnabledChange={setBlockUnpaid}
+              value={dueDays}
+              onChangeText={setDueDays}
+              C={C}
+            />
+
             <Pressable onPress={submit} disabled={assign.isPending} style={({ pressed }) => [styles.submit, (assign.isPending || pressed) && { opacity: 0.85 }]}>
               {assign.isPending ? <ActivityIndicator size="small" color="#fff" /> : (
                 <>
@@ -176,7 +199,7 @@ export default function AssignSubscriptionModal({ open, onClose, schoolId, schoo
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

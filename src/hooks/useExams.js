@@ -342,18 +342,16 @@ export function useSectionsForExam({ classId, enabled = true }) {
   });
 }
 
-export function useStudentsBySection({ sectionId, enabled = true }) {
+// The section's exam cohort: its current students plus those promoted out of it
+// in the exam's year, whose marks are still owed. `/student/list` misses those.
+export function useExamRoster({ examId, sectionId, enabled = true }) {
   return useQuery({
-    queryKey: ['students-by-section', sectionId],
-    queryFn: () =>
-      fetchData({
-        url: '/student/list',
-        page: 1,
-        limit: 500,
-        sectionId,
-        isActive: true,
-      }),
-    enabled: enabled && !!sectionId,
+    queryKey: ['exam-roster', examId, sectionId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/exam/${examId}/roster`, { params: { sectionId } });
+      return data?.data?.students || [];
+    },
+    enabled: enabled && !!examId && !!sectionId,
     staleTime: 30_000,
   });
 }

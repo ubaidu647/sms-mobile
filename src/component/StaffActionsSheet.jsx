@@ -2,12 +2,12 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import ToastModal from './ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useToggleStaffStatus, useDeleteStaff } from '../hooks/useStaff';
@@ -66,7 +66,7 @@ export default function StaffActionsSheet({
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <ToastModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
           style={[styles.sheet, { backgroundColor: C.card }]}
@@ -130,7 +130,7 @@ export default function StaffActionsSheet({
           </SafeAreaView>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ToastModal>
   );
 }
 

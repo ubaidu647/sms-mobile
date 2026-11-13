@@ -1,13 +1,12 @@
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { useColors } from '../../theme/useColors';
 import { COLORS } from '../../theme/colors';
 
@@ -31,10 +30,9 @@ export default function ConfirmModal({
   const bg = TONE_BG[confirmTone] || TONE_BG.primary;
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+    <ToastModal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: C.card }]}>
@@ -70,7 +68,7 @@ export default function ConfirmModal({
           </View>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </ToastModal>
   );
 }
 

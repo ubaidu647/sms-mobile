@@ -1,14 +1,16 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { fmtMoney, fmtDate, INVOICE_STATUS_PILL } from '../../constants/billing';
+import { fmtMoney, fmtDate, INVOICE_STATUS_PILL, invoiceTypeLabel } from '../../constants/billing';
 import { useColors } from '../../theme/useColors';
+import { useTranslations } from '../../i18n';
 
 // Read-only invoice view for the school admin. The whole invoice object comes
 // straight from GET /invoice/me (no extra fetch); there is no "Mark as paid"
 // action — paying invoices is super-admin only. Mirrors web MyInvoiceModal.
 export default function MyInvoiceModal({ open, invoice, onClose }) {
   const C = useColors();
+  const t = useTranslations('subscription');
   const cfg = INVOICE_STATUS_PILL[invoice?.status] || { bg: '#f3f4f6', fg: '#374151' };
 
   return (
@@ -56,7 +58,7 @@ export default function MyInvoiceModal({ open, invoice, onClose }) {
                 </Text>
               </View>
               <Text style={[styles.subtitle, { color: C.muted }]}>
-                {titleCase(invoice.type)} · {fmtDate(invoice.createdAt)}
+                {invoiceTypeLabel(invoice.type, t('addons.invoiceType'))} · {fmtDate(invoice.createdAt)}
               </Text>
             </View>
 
@@ -128,9 +130,6 @@ export default function MyInvoiceModal({ open, invoice, onClose }) {
     </Modal>
   );
 }
-
-const titleCase = (s) =>
-  s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '';
 
 function Row({ label, value, C, last }) {
   return (

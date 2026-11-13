@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +8,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import KeyboardAvoidingView from '../KeyboardAvoidingView';
+import ToastModal from '../ToastModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -105,6 +104,10 @@ export default function ExamFormModal({ open, exam, onClose }) {
   const update = useUpdateExam({ id: exam?._id, onSuccess: () => onClose() });
   const mut = isEdit ? update : create;
 
+  // Blank means "not given", as on the web: an edit keeps the stored value and
+  // a new exam gets the API's default. `Number('')` would have saved 0.
+  const passingBlank = String(passingPercentage ?? '').trim() === '';
+
   const validate = () => {
     if (!name?.trim()) return 'Name is required';
     if (!EXAM_TYPES.includes(type)) return 'Pick a valid type';
@@ -113,7 +116,7 @@ export default function ExamFormModal({ open, exam, onClose }) {
     if (!startDate) return 'Start date is required';
     if (!endDate) return 'End date is required';
     const p = Number(passingPercentage);
-    if (Number.isNaN(p) || p < 0 || p > 100)
+    if (!passingBlank && (Number.isNaN(p) || p < 0 || p > 100))
       return 'Passing percentage must be 0–100';
     return null;
   };
@@ -130,11 +133,12 @@ export default function ExamFormModal({ open, exam, onClose }) {
         type,
         startDate,
         endDate,
-        passingPercentage: Number(passingPercentage),
-        description: description.trim() || undefined,
+        // Sent even when blank: left out, the API keeps the old text.
+        description: description.trim(),
         status,
         isActive,
       };
+      if (!passingBlank) payload.passingPercentage = Number(passingPercentage);
       update.mutate(payload);
     } else {
       const payload = {
@@ -144,15 +148,15 @@ export default function ExamFormModal({ open, exam, onClose }) {
         academicYear,
         startDate,
         endDate,
-        passingPercentage: Number(passingPercentage),
       };
+      if (!passingBlank) payload.passingPercentage = Number(passingPercentage);
       if (description.trim()) payload.description = description.trim();
       create.mutate(payload);
     }
   };
 
   return (
-    <Modal
+    <ToastModal
       visible={open}
       animationType="slide"
       presentationStyle="formSheet"
@@ -185,7 +189,6 @@ export default function ExamFormModal({ open, exam, onClose }) {
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -387,7 +390,8 @@ export default function ExamFormModal({ open, exam, onClose }) {
                 <View>
                   <Text style={[styles.label, { color: C.muted }]}>STATUS</Text>
                   <View style={styles.chipRow}>
-                    {EXAM_STATUSES.map((s) => {
+                    {/* Publishing has its own endpoint: the update route refuses it. */}
+                    {EXAM_STATUSES.filter((s) => s !== 'published').map((s) => {
                       const active = status === s;
                       return (
                         <Pressable
@@ -482,7 +486,7 @@ export default function ExamFormModal({ open, exam, onClose }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </ToastModal>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +9,7 @@ import { useUserStore } from '../../src/store/userStore';
 import TopBar from '../../src/component/TopBar';
 import DrawerMenu from '../../src/component/Drawer';
 import SubscriptionGuard from '../../src/component/SubscriptionGuard';
+import { ScreenBody } from '../../src/component/KeyboardAvoidingView';
 import { useColors, useIsDark } from '../../src/theme/useColors';
 
 export default function AppLayout() {
@@ -42,7 +43,7 @@ export default function AppLayout() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: C.bg }]} edges={['top']}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
-        <View style={[styles.body, { backgroundColor: C.bg }]}>
+        <ScreenBody style={[styles.body, { backgroundColor: C.bg }]}>
           <Stack
             screenOptions={{
               headerShown: false,
@@ -50,7 +51,7 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: C.bg },
             }}
           />
-        </View>
+        </ScreenBody>
       </SafeAreaView>
     );
   }
@@ -62,7 +63,7 @@ export default function AppLayout() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <TopBar onMenu={() => setDrawerOpen(true)} />
       <SubscriptionGuard />
-      <View style={[styles.body, { backgroundColor: C.bg }]}>
+      <ScreenBody style={[styles.body, { backgroundColor: C.bg }]}>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -70,7 +71,7 @@ export default function AppLayout() {
             contentStyle: { backgroundColor: C.bg },
           }}
         />
-      </View>
+      </ScreenBody>
       <DrawerMenu open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </SafeAreaView>
   );
